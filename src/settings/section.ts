@@ -8,19 +8,11 @@
  */
 import { createElement as h, useEffect, useState } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
-import { setCapturing as setGlobalCapturing } from './capture-state.ts'
-import { currentConfig } from './config.ts'
-import { closePage, loadTriggerText, saveTriggerText } from './storage.ts'
-import { expressionOf } from './triggers.ts'
-
-/** Row and button spacing, kept local so the page adds no global CSS. */
-const STYLE = {
-  page: { display: 'flex', flexDirection: 'column', gap: '14px', padding: '4px 0' },
-  hint: { margin: 0, opacity: 0.72 },
-  list: { display: 'flex', flexDirection: 'column', gap: '8px' },
-  row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' },
-  actions: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-} as const
+import { setCapturing as setGlobalCapturing } from '../capture-state.ts'
+import { currentConfig } from '../config.ts'
+import { closePage, loadTriggerText, saveTriggerText } from '../storage.ts'
+import { STYLE } from './styles.ts'
+import { expressionOf } from '../trigger/expression.ts'
 
 /**
  * Render the trigger editor.

@@ -1,5 +1,8 @@
 /**
- * Custom triggers: the combinations the official shortcut catalog refuses.
+ * Trigger expressions: the text form, its parse, and the events it matches.
+ *
+ * Pure by construction — no listeners, no globals — so every rule here is
+ * testable without a DOM.
  *
  * The web build only accepts three Linux combinations, so a profile that wants
  * another one declares it as text and this module matches it directly. Matching
@@ -173,61 +176,6 @@ export function matchesKey(trigger: Trigger, event: KeyboardEvent): boolean {
  */
 export function matchesMouse(trigger: Trigger, event: MouseEvent): boolean {
   return trigger.kind === 'mouse' && event.button === trigger.button
-}
-
-/** What the engine needs from its owner. */
-export interface TriggerHost {
-  /** Triggers in force right now; re-read on every event so edits apply live. */
-  readonly triggers: () => readonly Trigger[]
-  /** Run the activation for one matched event. */
-  readonly fire: () => void
-}
-
-/**
- * Listen for the configured triggers.
- * @param host - trigger source and the action to run.
- * @returns the removal function.
- */
-export function startTriggers(host: TriggerHost): () => void {
-  const onKeyDown = (event: KeyboardEvent): void => {
-    if (event.repeat || event.isComposing) return
-    // AltGr reports ctrl+alt on Windows; it types a character, it is not a shortcut.
-    if (event.getModifierState?.('AltGraph') === true) return
-    for (const trigger of host.triggers()) {
-      if (!matchesKey(trigger, event)) continue
-      event.preventDefault()
-      event.stopPropagation()
-      host.fire()
-      return
-    }
-  }
-  const onMouseDown = (event: MouseEvent): void => {
-    for (const trigger of host.triggers()) {
-      if (!matchesMouse(trigger, event)) continue
-      event.preventDefault()
-      event.stopPropagation()
-      host.fire()
-      return
-    }
-  }
-  // Back/forward are acted on at auxclick, so the default has to be cancelled
-  // there too or the browser navigates while the capture starts.
-  const onAuxClick = (event: MouseEvent): void => {
-    for (const trigger of host.triggers()) {
-      if (!matchesMouse(trigger, event)) continue
-      event.preventDefault()
-      event.stopPropagation()
-      return
-    }
-  }
-  window.addEventListener('keydown', onKeyDown, true)
-  window.addEventListener('mousedown', onMouseDown, true)
-  window.addEventListener('auxclick', onAuxClick, true)
-  return () => {
-    window.removeEventListener('keydown', onKeyDown, true)
-    window.removeEventListener('mousedown', onMouseDown, true)
-    window.removeEventListener('auxclick', onAuxClick, true)
-  }
 }
 
 /** Modifier keys produce no expression of their own. */

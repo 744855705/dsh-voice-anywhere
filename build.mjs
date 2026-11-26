@@ -16,6 +16,7 @@ import { createRequire } from 'node:module'
 import { readFileSync, writeFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { sourceHash } from './scripts/source-hash.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const MANIFEST = JSON.parse(readFileSync(join(HERE, 'package.json'), 'utf8'))
@@ -124,6 +125,9 @@ async function main() {
     official: voice.version,
     builtAt: new Date().toISOString(),
     engines: MANIFEST.engines?.dsh ?? null,
+    // Hash of everything that can change behaviour. `npm run check-build`
+    // recomputes it, so a source edit that was never rebuilt cannot ship.
+    srcHash: sourceHash(HERE),
   }
   const stampPlugin = {
     name: 'voice-anywhere:stamp',

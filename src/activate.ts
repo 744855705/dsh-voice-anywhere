@@ -6,12 +6,12 @@
  * is capturing, otherwise press whichever control the current focus owns.
  */
 import { composerControl, floatingControl } from './controls.ts'
+import { note } from './diagnostics.ts'
 import { SELECTORS } from './selectors.ts'
 import { findSurface } from './surfaces.ts'
 import { classify } from './targets.ts'
 
 /** The composer card owns its own microphone; ancestry decides which one to press. */
-const COMPOSER_SCOPE = '[data-composer-card]'
 
 /** Frames to wait for the floating control to mount after we move focus. */
 const FOCUS_ATTEMPTS = 8
@@ -39,21 +39,9 @@ function focusAndPress(element: HTMLElement): void {
  * @param target - the event target, when a shortcut supplies one.
  * @returns the action to run, or null when nothing should happen.
  */
-/**
- * Record why an activation did or did not happen.
- * @param decision - branch that was taken and the states it was taken from.
- */
-function note(decision: Record<string, unknown>): void {
-  try {
-    ;(window as any).__voiceAnywhere = { ...(window as any).__voiceAnywhere, activation: decision }
-  } catch {
-    // Diagnostics must never affect behaviour.
-  }
-}
-
 export function planActivation(target?: Element | null): (() => void) | null {
   const focused = target ?? document.activeElement
-  const inComposer = focused instanceof Element && focused.closest(COMPOSER_SCOPE) !== null
+  const inComposer = focused instanceof Element && focused.closest(SELECTORS.composer) !== null
   const composerState = composerControl.state()
   const floatingState = floatingControl.state()
   const states = {

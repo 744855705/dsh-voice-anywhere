@@ -15,7 +15,6 @@
 import type { Surface } from './surfaces.ts'
 
 const BUTTON_SIZE = 30
-const ROW_HEIGHT = 36
 const ACTION_GAP = 8
 const MIN_ROW_WIDTH = 120
 /** Buttons within this vertical distance belong to one visual row. */
@@ -157,6 +156,12 @@ export function fieldBox(element: HTMLElement, expanded: boolean): Placement | n
  * @param expanded - whether the capture row is showing.
  * @returns the box and the scheme used, or null when nothing can be shown.
  */
+/** Resolved placement plus the scheme that produced it. */
+export interface Resolved {
+  readonly box: Placement
+  readonly mode: 'dock' | 'field'
+}
+
 export function placementFor(surface: Surface, expanded: boolean): Resolved | null {
   if (surface.kind === 'plain') {
     const box = fieldBox(surface.field, expanded)

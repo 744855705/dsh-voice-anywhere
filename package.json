@@ -1,6 +1,6 @@
 {
   "name": "dsh-voice-anywhere",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Voice input in any text field: the official microphone, reused as a floating control outside the conversation composer",
@@ -20,7 +20,10 @@
     "locale/*.json",
     "docs",
     "icon.svg",
-    "src"
+    "src",
+    "scripts",
+    "tsconfig.json",
+    "types"
   ],
   "dsh": {
     "bundle": {
@@ -31,6 +34,34 @@
     }
   },
   "engines": {
-    "dsh": "^0.2.3-alpha.2"
+    "dsh": "^0.2.3-alpha.2",
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "5.9"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/744855705/dsh-voice-anywhere.git"
+  },
+  "bugs": {
+    "url": "https://github.com/744855705/dsh-voice-anywhere/issues"
+  },
+  "homepage": "https://github.com/744855705/dsh-voice-anywhere#readme",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "voice",
+    "speech",
+    "dictation",
+    "microphone"
+  ],
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node scripts/run-tests.mjs",
+    "check-build": "node scripts/check-build.mjs",
+    "verify": "npm run typecheck && npm test && npm run check-build"
   }
 }

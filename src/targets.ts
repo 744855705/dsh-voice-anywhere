@@ -8,6 +8,8 @@
 /** A field inserts through its value setter; an editor inserts through the selection. */
 export type EditableKind = 'field' | 'editor'
 
+import { SELECTORS } from './selectors.ts'
+
 export interface EditableTarget {
   readonly element: HTMLElement
   readonly kind: EditableKind
@@ -17,7 +19,6 @@ export interface EditableTarget {
 const TEXT_INPUTS: ReadonlySet<string> = new Set(['text', 'search', 'url', 'tel', 'email'])
 
 /** The composer owns its own microphone, so nothing inside it is ours. */
-const COMPOSER = '[data-composer-card]'
 
 /**
  * Ignore controls that are present but unusable: hidden inputs, zero-size
@@ -37,7 +38,7 @@ function usable(element: HTMLElement): boolean {
  */
 export function classify(node: EventTarget | null): EditableTarget | null {
   if (!(node instanceof HTMLElement)) return null
-  if (node.closest(COMPOSER)) return null
+  if (node.closest(SELECTORS.composer)) return null
 
   if (node instanceof HTMLInputElement) {
     if (!TEXT_INPUTS.has(node.type) || node.disabled || node.readOnly || !usable(node)) return null
@@ -49,7 +50,7 @@ export function classify(node: EventTarget | null): EditableTarget | null {
   }
   // Focus can land on a child span; the editor root owns the caret and survives re-renders.
   const editor = node.closest('[contenteditable="true"], [contenteditable=""]')
-  if (editor instanceof HTMLElement && !editor.closest(COMPOSER) && usable(editor)) {
+  if (editor instanceof HTMLElement && !editor.closest(SELECTORS.composer) && usable(editor)) {
     return { element: editor, kind: 'editor' }
   }
   return null

@@ -23,7 +23,12 @@ ok('with nothing saved the configuration value is used')
 
 saveTriggerText(['Ctrl+Shift+Space'])
 assert.deepEqual(loadTriggerText(['Ctrl+/']), ['Ctrl+Shift+Space'])
-ok('a saved list wins over the configuration')
+assert.deepEqual(JSON.parse(store.get('dsh.voice-anywhere.triggers')), { v: 1, triggers: ['Ctrl+Shift+Space'] })
+ok('a saved list wins over the configuration and is stored versioned')
+
+store.set('dsh.voice-anywhere.triggers', JSON.stringify(['Ctrl+Alt+KeyK']))
+assert.deepEqual(loadTriggerText(['Ctrl+/']), ['Ctrl+Alt+KeyK'])
+ok('a pre-versioning bare array still loads')
 
 store.set('dsh.voice-anywhere.triggers', '{ not json')
 assert.deepEqual(loadTriggerText(['Ctrl+/']), ['Ctrl+/'])

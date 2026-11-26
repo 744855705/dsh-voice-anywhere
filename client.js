@@ -9,6 +9,1649 @@ let _deepseek_ai_dsh_client_store = require("@deepseek-ai/dsh-client-store");
 let react_dom = require("react-dom");
 let react_jsx_runtime = require("react/jsx-runtime");
 let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
+//#region \0voice-anywhere:build
+var _voice_anywhere_build_default = {
+	"official": "0.2.3-alpha.2",
+	"builtAt": "2026-11-26T19:33:28.388Z",
+	"engines": "^0.2.3-alpha.2",
+	"srcHash": "c574027040cb5ffa"
+};
+//#endregion
+//#region src/controls.ts
+/** The official microphone occupies this slot inside the composer card. */
+const COMPOSER_CONTAINER = "[data-composer-card] [data-slot=\"conversation.input.activity\"]";
+/** Our floating instance marks its portal root. */
+const FLOATING_ROOT = "[data-voice-anywhere-root]";
+/** Both instances render the capture row with this phase attribute. */
+const ACTIVITY = "[data-voice-activity]";
+/**
+* Read the phase of one microphone container.
+* @param container - slot anchor or portal root.
+* @returns the press-relevant state.
+*/
+function stateOf(container) {
+	if (container === null) return "none";
+	const row = container.querySelector(ACTIVITY);
+	if (row === null) return container.querySelector("button") === null ? "none" : "idle";
+	return row.getAttribute("data-voice-activity") === "recording" ? "recording" : "busy";
+}
+/**
+* Detect a capture already running somewhere other than `container`.
+* @param container - the container a press would act on, or null when it does not exist yet.
+* @returns whether another entry holds the microphone.
+*/
+function hasForeignRecording(container) {
+	for (const row of document.querySelectorAll("[data-voice-activity=\"recording\"]")) if (container === null || !container.contains(row)) return true;
+	return false;
+}
+/**
+* Build a control over one container.
+* @param find - locates the current container.
+* @returns the press contract.
+*/
+function controlOver(find) {
+	const state = () => stateOf(find());
+	const canPress = () => {
+		const container = find();
+		const phase = stateOf(container);
+		if (container === null || phase === "none" || phase === "busy") return false;
+		return phase === "recording" || !hasForeignRecording(container);
+	};
+	return {
+		state,
+		canPress,
+		press: () => {
+			if (!canPress()) return false;
+			const container = find();
+			if (container === null) return false;
+			const buttons = (container.querySelector(ACTIVITY) ?? container).querySelectorAll("button");
+			if (buttons.length === 0) return false;
+			(stateOf(container) === "recording" ? buttons[buttons.length - 1] : buttons[0]).click();
+			return true;
+		}
+	};
+}
+/** The microphone inside the conversation composer. */
+const composerControl = controlOver(() => document.querySelector(COMPOSER_CONTAINER));
+/** The microphone this plugin floats next to the focused field. */
+const floatingControl = controlOver(() => document.querySelector(FLOATING_ROOT));
+//#endregion
+//#region src/diagnostics.ts
+const MAX_EVENTS = 50;
+let facts = {};
+let events = [];
+/** Publish the current snapshot, ignoring a window that cannot hold it. */
+function publish() {
+	try {
+		window.__voiceAnywhere = {
+			...facts,
+			events: [...events]
+		};
+	} catch {}
+}
+/**
+* Replace the published surface.
+* @param initial - build metadata and any facts known at start-up.
+*/
+function installDiagnostics(initial) {
+	facts = { ...initial };
+	events = [];
+	publish();
+}
+/**
+* Record a handled failure and report it once on the console.
+* @param kind - short tag naming the failing step.
+* @param error - the thrown value.
+*/
+function report(kind, error) {
+	const message = error instanceof Error ? error.message : String(error);
+	events.push({
+		kind,
+		message,
+		at: (/* @__PURE__ */ new Date()).toISOString()
+	});
+	if (events.length > MAX_EVENTS) events.shift();
+	publish();
+	console.warn(`[voice-anywhere] ${kind}: ${message}`);
+}
+/**
+* Attach one fact to the published surface.
+* @param patch - fields to merge.
+*/
+function note(patch) {
+	facts = {
+		...facts,
+		...patch
+	};
+	publish();
+}
+//#endregion
+//#region src/selectors.ts
+/**
+* The DOM markers this plugin keys on.
+*
+* One definition each: the official `Modal` writes `data-shortcut-modal`, the
+* question card writes `data-question-key`, and the opt-in marker is ours. A
+* copy of any of these literals elsewhere is a bug waiting for a rename.
+*/
+const SELECTORS = {
+	/** The composer card; it owns its own microphone and is never ours. */
+	composer: "[data-composer-card]",
+	questionCard: "[data-question-key]",
+	dialog: "[role=\"dialog\"][aria-modal=\"true\"]",
+	shortcuts: "[data-shortcut-modal=\"shortcuts\"]",
+	settings: "[data-shortcut-modal=\"settings\"]",
+	platform: "[data-shortcut-modal=\"platform\"]",
+	marker: "[data-voice-input]"
+};
+//#endregion
+//#region src/config.ts
+/** Configuration used when the file is missing, unreadable, or invalid. */
+const DEFAULT_CONFIG = {
+	allow: [],
+	disable: [],
+	triggers: [],
+	settingsPage: true,
+	revision: "",
+	profile: ""
+};
+/** Where the host half publishes the profile's configuration. */
+const CONFIG_URL = "/voice-anywhere/config.json";
+const TARGETS = new Set([
+	"question-card",
+	"dialog",
+	"shortcuts"
+]);
+let current = DEFAULT_CONFIG;
+/** @returns the configuration in force right now. */
+function currentConfig() {
+	return current;
+}
+/** Replace the configuration in force (loader and tests). */
+function setConfig(next) {
+	current = next;
+}
+/**
+* Parse an unknown payload into a configuration, dropping anything off-schema.
+* @param raw - parsed JSON body.
+* @returns a configuration that is always safe to use.
+*/
+function normalizeConfig(raw) {
+	if (typeof raw !== "object" || raw === null) return DEFAULT_CONFIG;
+	return {
+		allow: Array.isArray(raw.allow) ? raw.allow.filter((entry) => typeof entry === "string" && entry.trim() !== "") : [],
+		disable: Array.isArray(raw.disable) ? raw.disable.filter((entry) => typeof entry === "string" && TARGETS.has(entry)) : [],
+		triggers: Array.isArray(raw.triggers) ? raw.triggers.filter((entry) => typeof entry === "string" && entry.trim() !== "") : [],
+		settingsPage: raw.settingsPage !== false,
+		revision: typeof raw.revision === "string" ? raw.revision : "",
+		profile: typeof raw.profile === "string" ? raw.profile : ""
+	};
+}
+/**
+* Load the profile configuration once.
+*
+* A transport or parse failure rejects, so the caller can report it; the
+* configuration in force is left untouched, which means a broken host can never
+* widen what the plugin attaches to.
+* @param fetchImpl - fetch implementation, injectable for tests.
+* @returns the configuration now in force.
+* @throws when the route is unreachable or the body is not JSON.
+*/
+async function loadConfig(fetchImpl = fetch) {
+	const response = await fetchImpl(CONFIG_URL, { credentials: "same-origin" });
+	if (!response.ok) throw new Error(`configuration route answered ${response.status}`);
+	setConfig(normalizeConfig(await response.json()));
+	return current;
+}
+//#endregion
+//#region src/policy.ts
+/**
+* Whether a selector matches the element or one of its ancestors.
+* @param element - candidate editable.
+* @param selector - user-supplied selector.
+* @returns whether it matches; an invalid selector matches nothing.
+*/
+function matchesScope(element, selector) {
+	try {
+		return element.closest(selector) !== null;
+	} catch {
+		return false;
+	}
+}
+/**
+* Decide whether the control may appear for one surface.
+* @param element - the editable in question.
+* @param kind - surface family resolved by `surfaces.ts`.
+* @param config - configuration in force.
+* @returns whether the surface is visible to the plugin.
+*/
+function isSurfaceVisible(element, kind, config) {
+	if (element.closest(SELECTORS.settings) !== null || element.closest(SELECTORS.platform) !== null) return false;
+	if (kind === "shortcuts") return !config.disable.includes("shortcuts");
+	if (kind === "dialog" && document.querySelector(SELECTORS.settings) !== null) return false;
+	if (kind === "question-card") return !config.disable.includes("question-card");
+	if (kind === "dialog") return !config.disable.includes("dialog");
+	if (element.closest(SELECTORS.marker) !== null) return true;
+	return config.allow.some((selector) => matchesScope(element, selector));
+}
+//#endregion
+//#region src/targets.ts
+/** Input types that hold free text; numbers, dates, files and passwords are excluded on purpose. */
+const TEXT_INPUTS = new Set([
+	"text",
+	"search",
+	"url",
+	"tel",
+	"email"
+]);
+/** The composer owns its own microphone, so nothing inside it is ours. */
+/**
+* Ignore controls that are present but unusable: hidden inputs, zero-size
+* terminal and editor textareas, and anything the composer owns.
+* @param element - candidate control.
+* @returns whether the control can receive dictated text.
+*/
+function usable(element) {
+	const rect = element.getBoundingClientRect();
+	return rect.width >= 60 && rect.height >= 16 && element.getClientRects().length > 0;
+}
+/**
+* Classify the element that just received focus.
+* @param node - focus target, possibly a descendant of an editor.
+* @returns the editable to dictate into, or null when this element is not ours.
+*/
+function classify(node) {
+	if (!(node instanceof HTMLElement)) return null;
+	if (node.closest(SELECTORS.composer)) return null;
+	if (node instanceof HTMLInputElement) {
+		if (!TEXT_INPUTS.has(node.type) || node.disabled || node.readOnly || !usable(node)) return null;
+		return {
+			element: node,
+			kind: "field"
+		};
+	}
+	if (node instanceof HTMLTextAreaElement) {
+		if (node.disabled || node.readOnly || !usable(node)) return null;
+		return {
+			element: node,
+			kind: "field"
+		};
+	}
+	const editor = node.closest("[contenteditable=\"true\"], [contenteditable=\"\"]");
+	if (editor instanceof HTMLElement && !editor.closest(SELECTORS.composer) && usable(editor)) return {
+		element: editor,
+		kind: "editor"
+	};
+	return null;
+}
+/**
+* Write dictated text into a target at its caret.
+* @param target - editable captured when recording started.
+* @param text - transcript.
+* @returns whether the text landed in the target.
+*/
+function insertText(target, text) {
+	if (!target.element.isConnected) return false;
+	return target.kind === "field" ? insertField(target.element, text) : insertEditor(target.element, text);
+}
+/**
+* React controls read their value back from the DOM on the native `input`
+* event, so the prototype setter (which bypasses React's value tracker) plus
+* one bubbling event is the path that keeps the component's own state in sync.
+* @param element - input or textarea.
+* @param text - transcript.
+* @returns true after the event is dispatched.
+*/
+function insertField(element, text) {
+	const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+	const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+	if (setter === void 0) return false;
+	const current = element.value;
+	const next = current + (current.length > 0 && !/\s$/u.test(current) ? " " : "") + text;
+	setter.call(element, next);
+	element.focus({ preventScroll: true });
+	const caret = next.length;
+	try {
+		element.setSelectionRange(caret, caret);
+	} catch {}
+	element.dispatchEvent(new Event("input", { bubbles: true }));
+	return true;
+}
+/**
+* Rich editors (Lexical among them) commit a `beforeinput` insertion in a
+* microtask, so a synchronous "unchanged" reading proves nothing: insert once,
+* and only a still-unchanged editor after three macrotasks gets one plain DOM
+* insert, which must not dispatch `input` or the text lands twice.
+* @param element - contenteditable host.
+* @param text - transcript.
+* @returns true after the first insertion attempt.
+*/
+function insertEditor(element, text) {
+	if (document.activeElement !== element) element.focus({ preventScroll: true });
+	const selection = document.getSelection();
+	if (selection !== null) {
+		const range = document.createRange();
+		range.selectNodeContents(element);
+		range.collapse(false);
+		selection.removeAllRanges();
+		selection.addRange(range);
+	}
+	const before = readEditor(element);
+	let executed = false;
+	try {
+		executed = document.execCommand("insertText", false, text);
+	} catch {
+		executed = false;
+	}
+	if (!executed) {
+		appendPlain(element, text);
+		return true;
+	}
+	setTimeout(() => setTimeout(() => setTimeout(() => {
+		if (element.isConnected && readEditor(element) === before) appendPlain(element, text);
+	}, 0), 0), 0);
+	return true;
+}
+/**
+* Read editor text without relying on layout.
+* @param element - contenteditable host.
+* @returns its current text.
+*/
+function readEditor(element) {
+	return element.innerText ?? element.textContent ?? "";
+}
+/**
+* Insert at the caret without touching the editor's event pipeline.
+* @param element - contenteditable host.
+* @param text - transcript.
+*/
+function appendPlain(element, text) {
+	const selection = document.getSelection();
+	const range = document.createRange();
+	const current = selection !== null && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+	if (current !== null && element.contains(current.endContainer)) {
+		range.setStart(current.endContainer, current.endOffset);
+		range.collapse(true);
+	} else {
+		range.selectNodeContents(element);
+		range.collapse(false);
+	}
+	range.insertNode(document.createTextNode(text));
+	const caret = document.createRange();
+	caret.selectNodeContents(element);
+	caret.collapse(false);
+	selection?.removeAllRanges();
+	selection?.addRange(caret);
+}
+//#endregion
+//#region src/surfaces.ts
+/**
+* Which surface the current focus belongs to.
+*
+* A surface is the smallest thing that decides both whether the microphone may
+* appear and where it goes: the official composer (never ours), the question
+* card, a dialog, the shortcut reference, or a plain field.
+*/
+/** Hosts worth scanning when nothing has focus; the card, every dialog, the reference. */
+const DOCK_HOSTS = `${SELECTORS.questionCard}, ${SELECTORS.dialog}, ${SELECTORS.shortcuts}`;
+/**
+* Find the first editable inside a host.
+* @param host - question card, dialog, or shortcut reference.
+* @returns the editable, or null when the host offers none.
+*/
+function fieldWithin(host) {
+	for (const element of host.querySelectorAll("textarea, input, [contenteditable=\"true\"], [contenteditable=\"\"]")) {
+		const found = classify(element);
+		if (found !== null) return {
+			element: found.element,
+			kind: found.kind
+		};
+	}
+	return null;
+}
+/**
+* Name the surface an editable belongs to.
+* @param element - the editable.
+* @param fieldKind - its classification.
+* @param focused - whether it holds focus.
+* @returns the resolved surface.
+*/
+function surfaceOf(element, fieldKind, focused) {
+	const card = element.closest(SELECTORS.questionCard);
+	if (card instanceof HTMLElement) return {
+		kind: "question-card",
+		focused,
+		host: card,
+		field: element,
+		fieldKind
+	};
+	const shortcuts = element.closest(SELECTORS.shortcuts);
+	if (shortcuts instanceof HTMLElement) return {
+		kind: "shortcuts",
+		focused,
+		host: shortcuts,
+		field: element,
+		fieldKind
+	};
+	const dialog = element.closest(SELECTORS.dialog);
+	if (dialog instanceof HTMLElement) return {
+		kind: "dialog",
+		focused,
+		host: dialog,
+		field: element,
+		fieldKind
+	};
+	return {
+		kind: "plain",
+		focused,
+		host: null,
+		field: element,
+		fieldKind
+	};
+}
+/**
+* Name a host scanned by selector, without asking the field for its ancestry.
+* @param host - element matched by `DOCK_HOSTS`.
+* @returns its surface kind.
+*/
+function kindOfHost(host) {
+	if (host.matches(SELECTORS.questionCard)) return "question-card";
+	if (host.matches(SELECTORS.shortcuts)) return "shortcuts";
+	if (host.matches(SELECTORS.dialog)) return "dialog";
+	return "plain";
+}
+/**
+* Resolve the surface that owns the control right now.
+*
+* Focus decides first. Without focus, only a host can carry the control, so the
+* highest host with an editable is considered — newest first, because dialogs
+* are appended to the body.
+* @param config - configuration in force.
+* @returns the visible surface, or null when nothing may show the control.
+*/
+function findSurface(config = currentConfig()) {
+	const focused = classify(document.activeElement);
+	if (focused !== null) {
+		const surface = surfaceOf(focused.element, focused.kind, true);
+		return isSurfaceVisible(surface.field, surface.kind, config) ? surface : null;
+	}
+	const hosts = document.querySelectorAll(DOCK_HOSTS);
+	for (let index = hosts.length - 1; index >= 0; index -= 1) {
+		const host = hosts[index];
+		const field = fieldWithin(host);
+		if (field === null) continue;
+		const surface = {
+			kind: kindOfHost(host),
+			focused: false,
+			host,
+			field: field.element,
+			fieldKind: field.kind
+		};
+		if (isSurfaceVisible(surface.field, surface.kind, config)) return surface;
+	}
+	return null;
+}
+//#endregion
+//#region src/activate.ts
+/**
+* The one activation both triggers share.
+*
+* A key, a mouse button and the official shortcut must agree on what "toggle
+* the microphone" means, so all three plan the same action here: stop whatever
+* is capturing, otherwise press whichever control the current focus owns.
+*/
+/** The composer card owns its own microphone; ancestry decides which one to press. */
+/** Frames to wait for the floating control to mount after we move focus. */
+const FOCUS_ATTEMPTS = 8;
+/**
+* Dictate into a field that does not have focus yet: move focus there, wait for
+* the floating control to mount, then press it exactly as a click would.
+* @param element - editable inside a visible host.
+*/
+function focusAndPress(element) {
+	element.focus({ preventScroll: true });
+	let attempts = 0;
+	const step = () => {
+		if (floatingControl.press()) return;
+		if (attempts < FOCUS_ATTEMPTS) {
+			attempts += 1;
+			requestAnimationFrame(step);
+		}
+	};
+	requestAnimationFrame(step);
+}
+/**
+* Plan the activation for this keypress or click.
+* @param target - the event target, when a shortcut supplies one.
+* @returns the action to run, or null when nothing should happen.
+*/
+function planActivation(target) {
+	const focused = target ?? document.activeElement;
+	const inComposer = focused instanceof Element && focused.closest(SELECTORS.composer) !== null;
+	const composerState = composerControl.state();
+	const floatingState = floatingControl.state();
+	const states = {
+		focused: focused instanceof Element ? focused.tagName : String(focused),
+		inComposer,
+		composerState,
+		floatingState,
+		field: classify(focused) !== null
+	};
+	if (composerState === "recording") {
+		note({
+			...states,
+			branch: "composer-recording"
+		});
+		return () => {
+			composerControl.press();
+		};
+	}
+	if (floatingState === "recording") {
+		note({
+			...states,
+			branch: "floating-recording"
+		});
+		return () => {
+			floatingControl.press();
+		};
+	}
+	if (inComposer && composerState === "idle") {
+		note({
+			...states,
+			branch: "composer-idle"
+		});
+		return () => {
+			composerControl.press();
+		};
+	}
+	if (!inComposer && floatingState === "idle") {
+		note({
+			...states,
+			branch: "floating-idle"
+		});
+		return () => {
+			floatingControl.press();
+		};
+	}
+	if (floatingState === "none") {
+		if (classify(focused) !== null) {
+			note({
+				...states,
+				branch: "denied-field"
+			});
+			return null;
+		}
+		const surface = findSurface();
+		if (surface !== null) {
+			note({
+				...states,
+				branch: `surface:${surface.kind}`
+			});
+			return () => focusAndPress(surface.field);
+		}
+		note({
+			...states,
+			branch: "no-surface"
+		});
+	}
+	if (focused instanceof Element && (focused.closest(SELECTORS.settings) !== null || focused.closest(SELECTORS.platform) !== null)) {
+		note({
+			...states,
+			branch: "settings-context"
+		});
+		return null;
+	}
+	if (floatingState === "none" && composerState === "idle") {
+		note({
+			...states,
+			branch: "composer-fallback"
+		});
+		return () => {
+			composerControl.press();
+		};
+	}
+	note({
+		...states,
+		branch: "nothing"
+	});
+	return null;
+}
+//#endregion
+//#region src/capture-state.ts
+/**
+* Whether the settings page is recording a trigger.
+*
+* The engine must go quiet while a trigger is being recorded, otherwise the
+* very combination the user is adding would fire dictation on the way in.
+*/
+let capturing = false;
+/** @returns whether a trigger is being recorded right now. */
+function isCapturing() {
+	return capturing;
+}
+/**
+* Mark the recorder as active or idle.
+* @param value - whether the page is capturing.
+*/
+function setCapturing(value) {
+	capturing = value;
+}
+//#endregion
+//#region src/face.ts
+/** The bundle whose detail page hosts the setup guidance. */
+const VOICE_BUNDLE = "@deepseek-ai/dsh-experimental-voice-input-bundle";
+/**
+* Build the injected face.
+* @param sources - context, speech, recorder and the navigation mirror.
+* @returns the object the slot injects.
+*/
+function createFace({ ctx, speech, recorder, navigation }) {
+	return {
+		hooks: {
+			speechReadiness: speech.store,
+			microphoneDevice: recorder.devices,
+			pluginNavigation: navigation
+		},
+		createRecording: () => recorder.createRecording(),
+		transcribe: (request, signal) => speech.transcribe(request, signal),
+		openSettings: () => {
+			try {
+				ctx.get("pluginNavigation")?.openBundle(VOICE_BUNDLE);
+			} catch (error) {
+				report("open-settings", error);
+			}
+		},
+		prepare: (providerId, options) => speech.prepare(providerId, options),
+		cancelPreparation: (providerId) => speech.cancelPreparation(providerId),
+		configure: (patch) => speech.configure(patch),
+		selectMicrophone: (device) => {
+			recorder.devices.set(device);
+		},
+		refreshReadiness: () => speech.refresh()
+	};
+}
+//#endregion
+//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/audio.ts
+/** Browser-owned microphone capture and native Web Audio resampling. */
+/** Capture failure whose message is localized by the caller. */
+var RecordingError = class extends Error {
+	kind;
+	constructor(kind) {
+		super(kind);
+		this.kind = kind;
+		this.name = "RecordingError";
+	}
+};
+/**
+* Encode mono floating-point samples as the canonical PCM16 WAV accepted by the Host.
+* @param samples - native-resampled 16 kHz mono samples.
+* @returns complete little-endian WAV bytes.
+*/
+function encodeWave(samples) {
+	const bytes = new Uint8Array(44 + samples.length * 2);
+	const view = new DataView(bytes.buffer);
+	const text = (at, value) => {
+		for (let i = 0; i < value.length; i++) bytes[at + i] = value.charCodeAt(i);
+	};
+	text(0, "RIFF");
+	view.setUint32(4, bytes.length - 8, true);
+	text(8, "WAVE");
+	text(12, "fmt ");
+	view.setUint32(16, 16, true);
+	view.setUint16(20, 1, true);
+	view.setUint16(22, 1, true);
+	view.setUint32(24, 16e3, true);
+	view.setUint32(28, 32e3, true);
+	view.setUint16(32, 2, true);
+	view.setUint16(34, 16, true);
+	text(36, "data");
+	view.setUint32(40, samples.length * 2, true);
+	for (const [i, sample] of samples.entries()) {
+		const value = Math.max(-1, Math.min(1, sample));
+		view.setInt16(44 + i * 2, Math.round(value * (value < 0 ? 32768 : 32767)), true);
+	}
+	return bytes;
+}
+/**
+* Encode the binary recording for the existing JSON Remote carrier.
+* @param bytes - complete recording.
+* @returns base64 with no data URL prefix.
+*/
+function audioBase64(bytes) {
+	let text = "";
+	for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode(...bytes.subarray(i, i + 8192));
+	return btoa(text);
+}
+/** One microphone acquisition, including a permission prompt that may settle after cancellation. */
+var Recording = class {
+	onDispose;
+	deviceId;
+	stream;
+	recorder;
+	context;
+	analyser;
+	samples = new Float32Array(256);
+	chunks = [];
+	lifetime = new AbortController();
+	disposal;
+	constructor(onDispose, deviceId = "") {
+		this.onDispose = onDispose;
+		this.deviceId = deviceId;
+	}
+	/**
+	* Acquire the selected microphone without recording or playing audio.
+	* @param onError - receives device interruptions before resource release completes.
+	* @returns after the level analyser starts; cancelled grants release their tracks immediately.
+	*/
+	async preview(onError) {
+		const devices = navigator.mediaDevices;
+		if (!devices) throw new RecordingError("unavailable");
+		let stream;
+		try {
+			stream = await devices.getUserMedia({
+				audio: {
+					echoCancellation: true,
+					noiseSuppression: true,
+					...this.deviceId === "" ? {} : { deviceId: { exact: this.deviceId } }
+				},
+				video: false
+			});
+		} catch (error) {
+			if (error instanceof DOMException) {
+				if (error.name === "NotAllowedError") throw new RecordingError("permission");
+				if (error.name === "NotFoundError" || error.name === "OverconstrainedError") throw new RecordingError("deviceMissing");
+			}
+			throw error;
+		}
+		if (this.lifetime.signal.aborted) {
+			stream.getTracks().forEach((track) => {
+				track.stop();
+			});
+			throw new RecordingError("cancelled");
+		}
+		this.stream = stream;
+		try {
+			this.context = new AudioContext();
+			this.analyser = this.context.createAnalyser();
+			this.analyser.fftSize = this.samples.length;
+			this.context.createMediaStreamSource(stream).connect(this.analyser);
+			for (const track of stream.getTracks()) track.addEventListener("ended", () => {
+				this.interrupted(onError);
+			}, { signal: this.lifetime.signal });
+		} catch (error) {
+			await this.dispose();
+			throw error;
+		}
+	}
+	/**
+	* Acquire the selected microphone and record audio for transcription.
+	* @param onError - receives failures during capture, before asynchronous resource release finishes.
+	* @returns after capture starts; a cancelled permission grant immediately releases its tracks.
+	*/
+	async start(onError) {
+		if (typeof MediaRecorder === "undefined") throw new RecordingError("unavailable");
+		await this.preview(onError);
+		if (this.lifetime.signal.aborted) throw new RecordingError("cancelled");
+		try {
+			this.recorder = new MediaRecorder(this.stream);
+			this.recorder.ondataavailable = (event) => {
+				if (!this.lifetime.signal.aborted && event.data.size > 0) this.chunks.push(event.data);
+			};
+			this.recorder.onerror = () => {
+				this.interrupted(onError);
+			};
+			this.recorder.start();
+		} catch (error) {
+			await this.dispose();
+			throw error;
+		}
+	}
+	interrupted(onError) {
+		if (this.lifetime.signal.aborted) return;
+		this.dispose().catch(() => void 0);
+		try {
+			onError?.(new RecordingError("interrupted"));
+		} catch (error) {
+			console.error("Speech recording error handler failed", error);
+		}
+	}
+	/**
+	* Read the live microphone signal.
+	* @returns the measured RMS level, or zero outside capture.
+	*/
+	amplitude() {
+		if (!this.analyser) return 0;
+		this.analyser.getFloatTimeDomainData(this.samples);
+		let sum = 0;
+		for (const sample of this.samples) sum += sample * sample;
+		return Math.sqrt(sum / this.samples.length);
+	}
+	/**
+	* Identify the input actually acquired by this operation.
+	* @returns the audio track's name and device group, or undefined outside capture.
+	*/
+	deviceInfo() {
+		const track = this.stream?.getAudioTracks()[0];
+		return track ? {
+			label: track.label,
+			groupId: track.getSettings().groupId ?? ""
+		} : void 0;
+	}
+	/**
+	* Finish capture and resample the recording.
+	* @param maxDurationSeconds - truncate timer overshoot to the Host limit.
+	* @returns one recording after the final MediaRecorder chunk arrives.
+	*/
+	async stop(maxDurationSeconds) {
+		const recorder = this.recorder;
+		const context = this.context;
+		if (!recorder || !context || recorder.state !== "recording") {
+			await this.dispose();
+			throw new RecordingError("empty");
+		}
+		try {
+			await new Promise((resolve, reject) => {
+				recorder.onstop = () => {
+					resolve();
+				};
+				recorder.onerror = () => {
+					reject(new RecordingError("empty"));
+				};
+				recorder.stop();
+			});
+			this.stream?.getTracks().forEach((track) => {
+				track.stop();
+			});
+			this.lifetime.signal.throwIfAborted();
+			const blob = new Blob(this.chunks, { type: recorder.mimeType });
+			if (blob.size === 0) throw new RecordingError("empty");
+			const decoded = await context.decodeAudioData(await blob.arrayBuffer());
+			this.lifetime.signal.throwIfAborted();
+			const offline = new OfflineAudioContext(1, Math.max(1, Math.floor(Math.min(decoded.duration, maxDurationSeconds) * 16e3)), 16e3);
+			const source = offline.createBufferSource();
+			source.buffer = decoded;
+			source.connect(offline.destination);
+			source.start();
+			const resampled = await offline.startRendering();
+			this.lifetime.signal.throwIfAborted();
+			return encodeWave(resampled.getChannelData(0));
+		} finally {
+			await this.dispose();
+		}
+	}
+	/**
+	* Release this recording and invalidate pending permission grants.
+	* @returns the shared release promise, including any AudioContext close failure.
+	*/
+	dispose() {
+		if (!this.disposal) {
+			const closing = Promise.withResolvers();
+			this.disposal = closing.promise;
+			this.release().then(closing.resolve, closing.reject);
+		}
+		return this.disposal;
+	}
+	async release() {
+		this.lifetime.abort(new RecordingError("cancelled"));
+		if (this.recorder?.state === "recording") this.recorder.stop();
+		this.stream?.getTracks().forEach((track) => {
+			track.stop();
+		});
+		this.stream = void 0;
+		const context = this.context;
+		this.context = void 0;
+		this.analyser = void 0;
+		this.chunks = [];
+		try {
+			if (context && context.state !== "closed") await context.close();
+		} finally {
+			this.onDispose();
+		}
+	}
+};
+//#endregion
+//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/failure-text.ts
+/**
+* Translate a capture or transcription failure.
+* @param failure - the rejected value.
+* @param t - the active voice-input translator.
+* @returns localized failure text.
+*/
+function failureText(failure, t) {
+	return failure instanceof RecordingError ? t(failure.kind) : t("failed", { message: failure instanceof Error ? failure.message : String(failure) });
+}
+//#endregion
+//#region \0voice-anywhere-css:/home/yanhongbin/deepseek-harness/packages/experimental/client-ui-voice-input/src/client/VoiceInput.module.css?va-module
+var VoiceInput_module_default = {
+	"stepBody": "qU0WNq_stepBody",
+	"preferences": "qU0WNq_preferences",
+	"sourceChoice": "qU0WNq_sourceChoice",
+	"downloadFailure": "qU0WNq_downloadFailure",
+	"deviceSelectMeter": "qU0WNq_deviceSelectMeter",
+	"settingsCard": "qU0WNq_settingsCard",
+	"triggerAnchor": "qU0WNq_triggerAnchor",
+	"roundButton": "qU0WNq_roundButton",
+	"summaryRow": "qU0WNq_summaryRow",
+	"activityMessage": "qU0WNq_activityMessage",
+	"preparation": "qU0WNq_preparation",
+	"preparationActions": "qU0WNq_preparationActions",
+	"waveform": "qU0WNq_waveform",
+	"progress": "qU0WNq_progress",
+	"stepProgress": "qU0WNq_stepProgress",
+	"deviceMeter": "qU0WNq_deviceMeter",
+	"inputLevel": "qU0WNq_inputLevel",
+	"deviceRow": "qU0WNq_deviceRow",
+	"setupEstimate": "qU0WNq_setupEstimate",
+	"deviceField": "qU0WNq_deviceField",
+	"inlineAction": "qU0WNq_inlineAction",
+	"deviceError": "qU0WNq_deviceError",
+	"metric": "qU0WNq_metric",
+	"trigger": "qU0WNq_trigger",
+	"preparationError": "qU0WNq_preparationError",
+	"summaryTitle": "qU0WNq_summaryTitle",
+	"captureRow": "qU0WNq_captureRow",
+	"steps": "qU0WNq_steps"
+};
+//#endregion
+//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/Waveform.tsx
+/** Live microphone amplitude history; animation updates SVG geometry without React state churn. */
+/** Render recent measured microphone levels; silent audio remains a dotted baseline. */
+function Waveform({ recording, label }) {
+	const svg = (0, react.useRef)(null);
+	(0, react.useEffect)(() => {
+		const bars = Array.from(svg.current.querySelectorAll("line")).reverse().map((element) => ({
+			element,
+			level: 0
+		}));
+		let frame, previous = -Infinity;
+		const draw = (now) => {
+			if (now - previous >= 50) {
+				previous = now;
+				let next = recording?.amplitude() ?? 0;
+				for (const bar of bars) {
+					const previousLevel = bar.level;
+					bar.level = next;
+					next = previousLevel;
+					const height = 1 + Math.min(1, bar.level * 5) * 17;
+					bar.element.setAttribute("y1", String(20 - height));
+					bar.element.setAttribute("y2", String(20 + height));
+				}
+			}
+			frame = requestAnimationFrame(draw);
+		};
+		frame = requestAnimationFrame(draw);
+		return () => {
+			cancelAnimationFrame(frame);
+		};
+	}, [recording]);
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
+		ref: svg,
+		className: VoiceInput_module_default.waveform,
+		viewBox: "0 0 640 40",
+		preserveAspectRatio: "none",
+		role: "img",
+		"aria-label": label,
+		children: Array.from({ length: 80 }, (_, index) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("line", {
+			x1: index * 8 + 4,
+			x2: index * 8 + 4,
+			y1: "19",
+			y2: "21",
+			stroke: "currentColor",
+			strokeWidth: "3",
+			strokeLinecap: "round",
+			opacity: .25 + index / 120
+		}, index))
+	});
+}
+//#endregion
+//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/VoiceSetupDialog.tsx
+/** Shared modal for voice activation and unavailable recognition. */
+/**
+* Guide activation or microphone clicks to the existing plugin details.
+* @param props - visibility, installation need and navigation callbacks.
+* @returns a dismissible prompt that never starts preparation or recording.
+*/
+function VoiceSetupDialog({ open, needsInstallation, onDismiss, onOpenDetails, t }) {
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+		open,
+		title: t(needsInstallation ? "setupPrompt.title" : "setupPrompt.unavailableTitle"),
+		closeLabel: t("cancel"),
+		onClose: onDismiss,
+		description: t(needsInstallation ? "setupPrompt.body" : "setupPrompt.unavailableBody"),
+		footer: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+			variant: "ghost",
+			onClick: onDismiss,
+			children: t("setupPrompt.later")
+		}), onOpenDetails !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+			variant: "primary",
+			"data-modal-autofocus": true,
+			onClick: onOpenDetails,
+			children: t(needsInstallation ? "setupPrompt.open" : "setupPrompt.details")
+		})] })
+	});
+}
+//#endregion
+//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/VoiceInput.tsx
+/** Click-to-record toolbar activity; transcripts remain in the original Session draft. */
+async function disposeRecording(capture) {
+	try {
+		await capture.dispose();
+	} catch (_error) {}
+}
+/** Render a compact microphone or an expanded capture, transcription, or retry row. */
+function VoiceInput({ sessionId, inputActions, locked, onActiveChange, createRecording, transcribe, openSettings, useSpeechReadiness, usePluginNavigation, t }) {
+	const readiness = useSpeechReadiness((value) => value), catalog = readiness.catalog;
+	const navigable = usePluginNavigation((present) => present);
+	const provider = catalog?.providers.find((item) => item.id === catalog.selection.providerId);
+	const usable = readiness.connected && (provider?.preparation.phase === "ready" || provider?.preparation.phase === "standby" || provider?.preparation.phase === "waking");
+	const [phase, setPhase] = (0, react.useState)("idle"), [message, setMessage] = (0, react.useState)(""), [pending, setPending] = (0, react.useState)("");
+	const [setupOpen, setSetupOpen] = (0, react.useState)(false);
+	(0, react.useEffect)(() => {
+		if (usable) setSetupOpen(false);
+	}, [usable]);
+	const current = (0, react.useRef)(), generation = (0, react.useRef)(0);
+	const expanded = phase !== "idle";
+	(0, react.useLayoutEffect)(() => {
+		onActiveChange(expanded);
+		return () => {
+			onActiveChange(false);
+		};
+	}, [expanded, onActiveChange]);
+	const cancel = () => {
+		generation.current++;
+		const active = current.current;
+		current.current = void 0;
+		if (active) {
+			clearTimeout(active.timer);
+			active.abort.abort();
+			disposeRecording(active.capture);
+		}
+		setPending("");
+		setMessage("");
+		setPhase("idle");
+		setSetupOpen(false);
+	};
+	(0, react.useEffect)(() => {
+		setPending("");
+		setMessage("");
+		setPhase("idle");
+		setSetupOpen(false);
+		const blur = () => {
+			if (current.current?.phase === "recording") cancel();
+		};
+		const visibility = () => {
+			if (document.hidden && current.current && current.current.phase !== "transcribing") cancel();
+		};
+		const escape = (event) => {
+			if (event.key === "Escape" && current.current) {
+				event.preventDefault();
+				cancel();
+			}
+		};
+		window.addEventListener("blur", blur);
+		document.addEventListener("visibilitychange", visibility);
+		document.addEventListener("keydown", escape);
+		return () => {
+			window.removeEventListener("blur", blur);
+			document.removeEventListener("visibilitychange", visibility);
+			document.removeEventListener("keydown", escape);
+			generation.current++;
+			const active = current.current;
+			current.current = void 0;
+			if (active) {
+				clearTimeout(active.timer);
+				active.abort.abort();
+				disposeRecording(active.capture);
+			}
+		};
+	}, [sessionId]);
+	const feedback = (text) => {
+		setMessage(text);
+		setPhase("feedback");
+	};
+	const finish = async () => {
+		const active = current.current;
+		if (!active || active.phase !== "recording") return;
+		active.phase = "transcribing";
+		const run = generation.current;
+		clearTimeout(active.timer);
+		setPhase("transcribing");
+		try {
+			const audio = await active.capture.stop(active.maxDurationSeconds);
+			if (run !== generation.current) return;
+			if (audio.byteLength > active.maxAudioBytes) {
+				feedback(t("tooLarge"));
+				return;
+			}
+			const result = await transcribe({
+				audioBase64: audioBase64(audio),
+				...active.selection
+			}, active.abort.signal);
+			if (run !== generation.current) return;
+			if (!result.ok) {
+				feedback(t("failed", { message: result.error.message }));
+				return;
+			}
+			if (result.value.text === "") {
+				feedback(t("empty"));
+				return;
+			}
+			if (!inputActions.insertText(result.value.text, active.span)) {
+				setPending(result.value.text);
+				feedback(t("conflict"));
+				return;
+			}
+			setPhase("idle");
+		} catch (failure) {
+			await disposeRecording(active.capture);
+			if (run === generation.current) feedback(failureText(failure, t));
+		} finally {
+			if (run === generation.current) current.current = void 0;
+		}
+	};
+	const start = async () => {
+		if (!catalog || !usable || locked || current.current) return;
+		const run = ++generation.current;
+		const active = {
+			capture: createRecording(),
+			abort: new AbortController(),
+			span: inputActions.captureInsertion(),
+			selection: catalog.selection,
+			maxDurationSeconds: catalog.maxDurationSeconds,
+			maxAudioBytes: catalog.maxAudioBytes,
+			phase: "requesting"
+		};
+		current.current = active;
+		setMessage("");
+		setPending("");
+		setPhase("requesting");
+		try {
+			await active.capture.start((failure) => {
+				if (run !== generation.current || current.current !== active || active.phase === "transcribing") return;
+				current.current = void 0;
+				clearTimeout(active.timer);
+				active.abort.abort();
+				feedback(failureText(failure, t));
+			});
+			if (run !== generation.current || current.current !== active) return;
+			active.phase = "recording";
+			setPhase("recording");
+			active.timer = setTimeout(() => {
+				finish();
+			}, active.maxDurationSeconds * 1e3);
+		} catch (failure) {
+			await disposeRecording(active.capture);
+			if (run === generation.current) {
+				current.current = void 0;
+				feedback(failureText(failure, t));
+			}
+		}
+	};
+	if (!expanded) return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
+		label: t("dictate"),
+		disabled: !usable,
+		side: "top",
+		portal: true,
+		children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+			className: VoiceInput_module_default.triggerAnchor,
+			children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				className: VoiceInput_module_default.trigger,
+				size: "sm",
+				disabled: locked,
+				"aria-label": t(usable ? "start" : "setupPrompt.trigger"),
+				"aria-haspopup": usable ? void 0 : "dialog",
+				onMouseDown: (event) => {
+					event.preventDefault();
+				},
+				onClick: () => {
+					if (usable) start();
+					else setSetupOpen(true);
+				},
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconMicrophoneOutlineRegular, { size: 18 })
+			})
+		})
+	}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(VoiceSetupDialog, {
+		open: setupOpen && !usable,
+		needsInstallation: readiness.connected && provider?.location === "host-local" && provider.preparation.phase === "unprepared",
+		onDismiss: () => {
+			setSetupOpen(false);
+		},
+		onOpenDetails: navigable ? () => {
+			setSetupOpen(false);
+			openSettings();
+		} : void 0,
+		t
+	})] });
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: VoiceInput_module_default.captureRow,
+		"data-voice-activity": phase,
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				type: "button",
+				className: VoiceInput_module_default.roundButton,
+				size: "sm",
+				"aria-label": t(pending ? "discard" : "cancel"),
+				onClick: cancel,
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconCloseOutlineRegular, { size: 14 })
+			}),
+			phase === "recording" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Waveform, {
+				recording: current.current?.capture,
+				label: t("recording")
+			}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+				className: VoiceInput_module_default.activityMessage,
+				role: "status",
+				title: pending || message,
+				children: [(phase === "requesting" || phase === "transcribing") && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.StateDot, { state: "ongoing" }), phase === "feedback" ? message : t(phase === "requesting" ? "requesting" : provider?.preparation.phase === "waking" ? "wakingShort" : "transcribingShort")]
+			}),
+			phase === "recording" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				type: "button",
+				className: VoiceInput_module_default.roundButton,
+				size: "sm",
+				"aria-label": t("stop"),
+				onClick: () => {
+					finish();
+				},
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconStopFillRegular, { size: 14 })
+			}),
+			phase === "feedback" && (pending ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				className: VoiceInput_module_default.inlineAction,
+				size: "sm",
+				type: "button",
+				onClick: () => {
+					if (inputActions.insertText(pending, inputActions.captureInsertion())) {
+						setPending("");
+						setPhase("idle");
+					}
+				},
+				children: t("insert")
+			}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				className: VoiceInput_module_default.roundButton,
+				size: "sm",
+				type: "button",
+				"aria-label": t("retryRecording"),
+				disabled: !usable || locked,
+				onClick: () => {
+					start();
+				},
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconMicrophoneOutlineRegular, { size: 18 })
+			}))
+		]
+	});
+}
+//#endregion
+//#region src/placement.ts
+const BUTTON_SIZE = 30;
+const ACTION_GAP = 8;
+const MIN_ROW_WIDTH = 120;
+/** Buttons within this vertical distance belong to one visual row. */
+const CELL_TOLERANCE = 6;
+/** Buttons closer than this horizontally belong to one cluster. */
+const CLUSTER_GAP = 24;
+/** An action row has at least this many buttons. */
+const MIN_ACTION_BUTTONS = 2;
+/**
+* Group the host's visible buttons into rows and return the rightmost cluster
+* of its lowest row. The question pager's chevrons sit far from the footer
+* actions, so the cluster split keeps them out automatically.
+* @param host - question card or dialog.
+* @returns the cluster, or null when the host has no action row.
+*/
+function actionCluster(host) {
+	const items = [...host.querySelectorAll("button")].map((element) => ({
+		element,
+		rect: element.getBoundingClientRect()
+	})).filter((item) => item.rect.width > 0 && item.rect.height > 0);
+	if (items.length === 0) return null;
+	const rows = [];
+	for (const item of [...items].sort((left, right) => left.rect.top - right.rect.top)) {
+		const row = rows.find((candidate) => Math.abs(candidate.top - item.rect.top) <= CELL_TOLERANCE);
+		if (row !== void 0) row.items.push(item);
+		else rows.push({
+			top: item.rect.top,
+			items: [item]
+		});
+	}
+	const lowest = rows[rows.length - 1];
+	const clusters = [];
+	for (const item of [...lowest.items].sort((left, right) => left.rect.left - right.rect.left)) {
+		const current = clusters[clusters.length - 1];
+		const last = current?.[current.length - 1];
+		if (current !== void 0 && last !== void 0 && item.rect.left - last.rect.right <= CLUSTER_GAP) current.push(item);
+		else clusters.push([item]);
+	}
+	const cluster = clusters[clusters.length - 1];
+	const first = cluster?.[0];
+	const parent = first?.element.parentElement;
+	if (cluster === void 0 || cluster.length < MIN_ACTION_BUTTONS || first === void 0 || parent === null || parent === void 0) return null;
+	const top = Math.min(...cluster.map((item) => item.rect.top));
+	const bottom = Math.max(...cluster.map((item) => item.rect.bottom));
+	return {
+		left: Math.min(...cluster.map((item) => item.rect.left)),
+		top,
+		height: bottom - top,
+		parent
+	};
+}
+/**
+* Bound the docked row on the left by what the row already shows.
+* @param rowElement - the action cluster's grandparent row (holds the pager).
+* @param band - the action row's vertical band.
+* @param right - the row's right edge.
+* @returns the leftmost usable x.
+*/
+function leftBoundary(rowElement, band, right) {
+	const rowRect = rowElement.getBoundingClientRect();
+	let left = rowRect.left + ACTION_GAP;
+	for (const child of [...rowElement.children]) {
+		if (!(child instanceof HTMLElement)) continue;
+		const rect = child.getBoundingClientRect();
+		if (rect.width <= 0 || rect.height <= 0 || rect.right > right) continue;
+		if (rect.width > rowRect.width * .5) continue;
+		if (rect.bottom < band.top - 10 || rect.top > band.bottom + 10) continue;
+		left = Math.max(left, rect.right + ACTION_GAP);
+	}
+	return left;
+}
+/**
+* Dock the control into a host's action row.
+* @param host - question card or dialog.
+* @param expanded - whether the capture row is showing.
+* @returns the box, or null when the host has no usable action row.
+*/
+function dockBox(host, expanded) {
+	const cluster = actionCluster(host);
+	if (cluster === null) return null;
+	const right = cluster.left - ACTION_GAP;
+	const left = leftBoundary(cluster.parent.parentElement ?? cluster.parent, {
+		top: cluster.top,
+		bottom: cluster.top + cluster.height
+	}, right);
+	const top = cluster.top + cluster.height / 2;
+	if (expanded) {
+		if (right - left < MIN_ROW_WIDTH) return null;
+		return {
+			left,
+			top,
+			width: right - left
+		};
+	}
+	return {
+		left: right - BUTTON_SIZE,
+		top,
+		width: BUTTON_SIZE
+	};
+}
+/**
+* Follow the field itself.
+* @param element - the focused editable.
+* @param expanded - whether the capture row is showing.
+* @returns the box, or null when the field has no usable geometry.
+*/
+function fieldBox(element, expanded) {
+	const rect = element.getBoundingClientRect();
+	if (rect.width < 60 || rect.height < 16) return null;
+	if (!expanded) return {
+		left: Math.max(8, Math.min(rect.right - BUTTON_SIZE - 4, window.innerWidth - BUTTON_SIZE - 6)),
+		top: rect.top + rect.height / 2,
+		width: BUTTON_SIZE
+	};
+	const width = Math.max(160, Math.min(rect.width, window.innerWidth - 16));
+	return {
+		left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+		top: rect.top + rect.height / 2,
+		width
+	};
+}
+function placementFor(surface, expanded) {
+	if (surface.kind === "plain") {
+		const box = fieldBox(surface.field, expanded);
+		return box === null ? null : {
+			box,
+			mode: "field"
+		};
+	}
+	const docked = surface.host === null ? null : dockBox(surface.host, expanded);
+	if (docked !== null) return {
+		box: docked,
+		mode: "dock"
+	};
+	if (!surface.focused) return null;
+	const box = fieldBox(surface.field, expanded);
+	return box === null ? null : {
+		box,
+		mode: "field"
+	};
+}
+/**
+* Report the numbers behind a dock decision, for diagnostics.
+* @param host - question card or dialog.
+* @returns cluster geometry and the resulting band.
+*/
+function dockProbe(host) {
+	const cluster = actionCluster(host);
+	if (cluster === null) return { host: "no-action-row" };
+	const right = cluster.left - ACTION_GAP;
+	const rowElement = cluster.parent.parentElement ?? cluster.parent;
+	const left = leftBoundary(rowElement, {
+		top: cluster.top,
+		bottom: cluster.top + cluster.height
+	}, right);
+	return {
+		actionLeft: Math.round(cluster.left),
+		right: Math.round(right),
+		left: Math.round(left),
+		width: Math.round(right - left),
+		band: Math.round(cluster.top),
+		children: [...rowElement.children].map((child) => ({
+			right: Math.round(child.getBoundingClientRect().right),
+			width: Math.round(child.getBoundingClientRect().width)
+		}))
+	};
+}
+//#endregion
+//#region src/floating/use-surface-control.ts
+/**
+* The control's state: which editable it serves, where it sits, and whether the
+* capture row is open.
+*
+* Kept out of the component so the rendering file stays a description of the
+* portal, and so this state machine can be reasoned about (and later tested)
+* without a renderer.
+*/
+/** How often the surface is re-resolved when no event fires. */
+const SYNC_MS = 300;
+/**
+* Track the surface the control belongs to.
+* @param refreshReadiness - speech readiness refresh, run once on mount.
+* @returns the state the view renders from.
+*/
+function useSurfaceControl(refreshReadiness) {
+	const [target, setTarget] = (0, react.useState)(null);
+	const [box, setBox] = (0, react.useState)(null);
+	const [expanded, setExpanded] = (0, react.useState)(false);
+	const [locked, setLocked] = (0, react.useState)(false);
+	const [mode, setMode] = (0, react.useState)("field");
+	const expandedRef = (0, react.useRef)(false);
+	const rootRef = (0, react.useRef)(null);
+	const signature = (0, react.useRef)("");
+	const syncRef = (0, react.useRef)(() => {});
+	const identity = (0, react.useRef)(/* @__PURE__ */ new WeakMap());
+	const identities = (0, react.useRef)(0);
+	const identityOf = (element) => {
+		const known = identity.current.get(element);
+		if (known !== void 0) return known;
+		identities.current += 1;
+		identity.current.set(element, identities.current);
+		return identities.current;
+	};
+	expandedRef.current = expanded;
+	(0, react.useEffect)(() => {
+		const sync = () => {
+			const surface = findSurface();
+			let next = null;
+			let placement = null;
+			let resolvedMode = "field";
+			if (surface !== null) {
+				next = {
+					element: surface.field,
+					kind: surface.fieldKind
+				};
+				const resolved = placementFor(surface, expandedRef.current);
+				placement = resolved?.box ?? null;
+				resolvedMode = resolved?.mode ?? "field";
+				if (surface.host !== null) note({ dock: {
+					kind: surface.kind,
+					focused: surface.focused,
+					...dockProbe(surface.host)
+				} });
+				note({ last: {
+					expanded: expandedRef.current,
+					kind: surface.kind,
+					focused: surface.focused,
+					box: placement === null ? null : {
+						left: Math.round(placement.left),
+						top: Math.round(placement.top),
+						width: Math.round(placement.width)
+					}
+				} });
+			}
+			if (next !== null && !next.element.isConnected && !expandedRef.current) {
+				next = null;
+				placement = null;
+			}
+			if (expandedRef.current && (next === null || placement === null)) return;
+			const key = next === null || placement === null ? "" : `${resolvedMode}|${placement.left}|${placement.top}|${placement.width}|${identityOf(next.element)}`;
+			if (key !== signature.current) {
+				signature.current = key;
+				setTarget(next);
+				setBox(placement);
+				setMode(resolvedMode);
+			}
+			setLocked(hasForeignRecording(rootRef.current));
+		};
+		syncRef.current = sync;
+		sync();
+		refreshReadiness();
+		document.addEventListener("focusin", sync, true);
+		document.addEventListener("focusout", sync, true);
+		window.addEventListener("scroll", sync, true);
+		window.addEventListener("resize", sync);
+		const timer = window.setInterval(sync, SYNC_MS);
+		return () => {
+			document.removeEventListener("focusin", sync, true);
+			document.removeEventListener("focusout", sync, true);
+			window.removeEventListener("scroll", sync, true);
+			window.removeEventListener("resize", sync);
+			window.clearInterval(timer);
+			syncRef.current = () => {};
+		};
+	}, [refreshReadiness]);
+	(0, react.useEffect)(() => {
+		const element = target?.element ?? null;
+		if (element === null) return void 0;
+		if (expanded && mode === "field") element.setAttribute("data-voice-anywhere-capturing", "");
+		else element.removeAttribute("data-voice-anywhere-capturing");
+		return () => {
+			element.removeAttribute("data-voice-anywhere-capturing");
+		};
+	}, [
+		target,
+		expanded,
+		mode
+	]);
+	(0, react.useLayoutEffect)(() => {
+		syncRef.current();
+	}, [expanded]);
+	return {
+		target,
+		box,
+		expanded,
+		mode,
+		locked,
+		setExpanded,
+		rootRef
+	};
+}
+//#endregion
+//#region src/floating/view.ts
+/**
+* The floating control's rendering: the official microphone in a portal, sized
+* and positioned by `use-surface-control`.
+*
+* Nothing about the button, its capture row or its feedback is reimplemented.
+*/
+/** The component only uses the id to reset its capture state. */
+const FIXED_SESSION = "voice-anywhere";
+/**
+* Copy as the last resort so a transcript is never lost when its field closed.
+* @param text - transcript.
+*/
+function copyToClipboard(text) {
+	navigator.clipboard?.writeText(text).catch(() => void 0);
+}
+/**
+* Render the official microphone where the current editable needs it.
+* @param props - injected speech face, synthesized readiness hooks, translator.
+* @returns the portal, or null while no editable is available.
+*/
+function FloatingMic(props) {
+	const { createRecording, transcribe, openSettings, prepare, cancelPreparation, configure, selectMicrophone, refreshReadiness, useSpeechReadiness, useMicrophoneDevice, usePluginNavigation, t } = props;
+	const { target, box, locked, setExpanded, rootRef } = useSurfaceControl(refreshReadiness);
+	if (target === null || box === null) return null;
+	return (0, react_dom.createPortal)((0, react.createElement)("div", {
+		"data-voice-anywhere-root": "",
+		ref: rootRef,
+		style: {
+			position: "fixed",
+			left: `${box.left}px`,
+			top: `${box.top}px`,
+			width: `${box.width}px`,
+			transform: "translateY(-50%)",
+			display: "flex",
+			alignItems: "center",
+			justifyContent: "center",
+			zIndex: 1050,
+			pointerEvents: "none"
+		}
+	}, (0, react.createElement)("div", { style: {
+		pointerEvents: "auto",
+		width: "100%",
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "center",
+		boxSizing: "border-box"
+	} }, (0, react.createElement)(VoiceInput, {
+		sessionId: FIXED_SESSION,
+		inputActions: {
+			captureInsertion: () => target.element.isConnected ? {
+				element: target.element,
+				kind: target.kind
+			} : null,
+			insertText: (text, span) => {
+				if (span !== null) return span.element.isConnected && insertText({
+					element: span.element,
+					kind: span.kind
+				}, text);
+				copyToClipboard(text);
+				return true;
+			}
+		},
+		locked,
+		onActiveChange: setExpanded,
+		createRecording,
+		transcribe,
+		openSettings,
+		prepare,
+		cancelPreparation,
+		configure,
+		selectMicrophone,
+		useSpeechReadiness,
+		useMicrophoneDevice,
+		usePluginNavigation,
+		t
+	}))), document.body);
+}
+//#endregion
 //#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/locales.ts
 /** Chinese dictionary and key source. */
 const zh = {
@@ -947,1568 +2590,160 @@ const pt = {
 	tooLarge: "A gravação excede o limite de serviço. Experimente uma gravação mais curta."
 };
 //#endregion
-//#region \0voice-anywhere:build
-var _voice_anywhere_build_default = {
-	"official": "0.2.3-alpha.2",
-	"builtAt": "2026-11-26T19:12:03.334Z",
-	"engines": "^0.2.3-alpha.2"
+//#region src/locales.ts
+/**
+* Every string this plugin adds to the locale service.
+*
+* The official voice component ships its own dictionaries; these overlay the
+* command label and the settings page's copy. Keys are flat: the locale service
+* indexes dictionaries literally, so `'settings.label'` is the key, not a path.
+*/
+/** The plugin's locale namespace. */
+const NAMESPACE = "voice-anywhere";
+const COMMAND_LABEL = {
+	zh: "任意输入框语音输入",
+	en: "Voice input in any text field",
+	ja: "任意の入力欄で音声入力",
+	es: "Dictado en cualquier campo de texto",
+	fr: "Dictée dans n’importe quel champ",
+	de: "Spracheingabe in jedem Textfeld",
+	ru: "Голосовой ввод в любом поле",
+	pt: "Ditado em qualquer campo de texto"
+};
+/** The settings page's own copy; English carries every language written by hand here. */
+const SETTINGS_TEXT = {
+	zh: {
+		"settings.label": "语音输入",
+		"settings.hint": "在这里添加触发键（键盘组合或鼠标键）。官方快捷键列表里的组合仍然有效，两者并存。",
+		"settings.empty": "还没有自定义触发键。",
+		"settings.capture": "录制按键",
+		"settings.capturing": "请按下按键或鼠标键…",
+		"settings.captured": "已添加：",
+		"settings.rejected": "这个组合无法用作触发键：",
+		"settings.remove": "删除",
+		"settings.close": "关闭此设置页"
+	},
+	en: {
+		"settings.label": "Voice input",
+		"settings.hint": "Add triggers (a key combination or a mouse button). Combinations in the official shortcut list keep working; both run side by side.",
+		"settings.empty": "No custom trigger yet.",
+		"settings.capture": "Record a trigger",
+		"settings.capturing": "Press a key or a mouse button…",
+		"settings.captured": "Added:",
+		"settings.rejected": "That combination cannot be a trigger:",
+		"settings.remove": "Remove",
+		"settings.close": "Close this page"
+	}
+};
+/** Locale dictionaries installed for every shipped language. */
+const DICTS = {
+	zh: {
+		...zh,
+		command: COMMAND_LABEL.zh,
+		...SETTINGS_TEXT.zh
+	},
+	en: {
+		...en,
+		command: COMMAND_LABEL.en,
+		...SETTINGS_TEXT.en
+	},
+	ja: {
+		...ja,
+		command: COMMAND_LABEL.ja,
+		...SETTINGS_TEXT.en
+	},
+	es: {
+		...es,
+		command: COMMAND_LABEL.es,
+		...SETTINGS_TEXT.en
+	},
+	fr: {
+		...fr,
+		command: COMMAND_LABEL.fr,
+		...SETTINGS_TEXT.en
+	},
+	de: {
+		...de,
+		command: COMMAND_LABEL.de,
+		...SETTINGS_TEXT.en
+	},
+	ru: {
+		...ru,
+		command: COMMAND_LABEL.ru,
+		...SETTINGS_TEXT.en
+	},
+	pt: {
+		...pt,
+		command: COMMAND_LABEL.pt,
+		...SETTINGS_TEXT.en
+	}
 };
 //#endregion
-//#region src/controls.ts
-/** The official microphone occupies this slot inside the composer card. */
-const COMPOSER_CONTAINER = "[data-composer-card] [data-slot=\"conversation.input.activity\"]";
-/** Our floating instance marks its portal root. */
-const FLOATING_ROOT = "[data-voice-anywhere-root]";
-/** Both instances render the capture row with this phase attribute. */
-const ACTIVITY = "[data-voice-activity]";
+//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/microphone-device.ts
+/** Browser-local microphone preference shared by settings previews and dictation. */
 /**
-* Read the phase of one microphone container.
-* @param container - slot anchor or portal root.
-* @returns the press-relevant state.
+* Restore the browser preference independently of Host recognition settings.
+* @returns validated device selection, persisted through the shared Client store.
 */
-function stateOf(container) {
-	if (container === null) return "none";
-	const row = container.querySelector(ACTIVITY);
-	if (row === null) return container.querySelector("button") === null ? "none" : "idle";
-	return row.getAttribute("data-voice-activity") === "recording" ? "recording" : "busy";
+function createMicrophoneDeviceStore() {
+	const store = (0, _deepseek_ai_dsh_client_store.createSnapshotStore)({
+		id: "",
+		label: ""
+	}, { persist: { name: "dsh.voice-input.microphone" } });
+	const saved = store.getSnapshot();
+	if (!saved || typeof saved !== "object" || !("id" in saved) || typeof saved.id !== "string" || !("label" in saved) || typeof saved.label !== "string") store.set({
+		id: "",
+		label: ""
+	});
+	return store;
 }
+//#endregion
+//#region src/recording.ts
 /**
-* Detect a capture already running somewhere other than `container`.
-* @param container - the container a press would act on, or null when it does not exist yet.
-* @returns whether another entry holds the microphone.
+* Microphone capture, reused from the official client source.
+*
+* `Recording` owns permission, MediaRecorder and the 16 kHz mono WAV encoding
+* the Host validates, so duplicating it would only add a way to drift from the
+* official button. The device preference is the one the official picker saved:
+* it is re-read on every capture because that picker writes the same key.
 */
-function hasForeignRecording(container) {
-	for (const row of document.querySelectorAll("[data-voice-activity=\"recording\"]")) if (container === null || !container.contains(row)) return true;
-	return false;
-}
-/**
-* Build a control over one container.
-* @param find - locates the current container.
-* @returns the press contract.
-*/
-function controlOver(find) {
-	const state = () => stateOf(find());
-	const canPress = () => {
-		const container = find();
-		const phase = stateOf(container);
-		if (container === null || phase === "none" || phase === "busy") return false;
-		return phase === "recording" || !hasForeignRecording(container);
+/** Persistence key owned by the official microphone picker. */
+const DEVICE_KEY = "dsh.voice-input.microphone";
+function createRecorder() {
+	const devices = createMicrophoneDeviceStore();
+	const live = /* @__PURE__ */ new Set();
+	/**
+	* Read the currently chosen microphone; the store is only a fallback because
+	* another plugin instance may have written the key after we mounted.
+	* @returns a device id, or an empty string for the system default.
+	*/
+	const currentDeviceId = () => {
+		try {
+			const saved = JSON.parse(localStorage.getItem(DEVICE_KEY) ?? "null");
+			if (saved !== null && typeof saved === "object" && "id" in saved) {
+				const id = saved.id;
+				if (typeof id === "string") return id;
+			}
+		} catch {}
+		return devices.getSnapshot().id;
 	};
 	return {
-		state,
-		canPress,
-		press: () => {
-			if (!canPress()) return false;
-			const container = find();
-			if (container === null) return false;
-			const buttons = (container.querySelector(ACTIVITY) ?? container).querySelectorAll("button");
-			if (buttons.length === 0) return false;
-			(stateOf(container) === "recording" ? buttons[buttons.length - 1] : buttons[0]).click();
-			return true;
-		}
-	};
-}
-/** The microphone inside the conversation composer. */
-const composerControl = controlOver(() => document.querySelector(COMPOSER_CONTAINER));
-/** The microphone this plugin floats next to the focused field. */
-const floatingControl = controlOver(() => document.querySelector(FLOATING_ROOT));
-//#endregion
-//#region src/selectors.ts
-/**
-* The DOM markers this plugin keys on.
-*
-* One definition each: the official `Modal` writes `data-shortcut-modal`, the
-* question card writes `data-question-key`, and the opt-in marker is ours. A
-* copy of any of these literals elsewhere is a bug waiting for a rename.
-*/
-const SELECTORS = {
-	questionCard: "[data-question-key]",
-	dialog: "[role=\"dialog\"][aria-modal=\"true\"]",
-	shortcuts: "[data-shortcut-modal=\"shortcuts\"]",
-	settings: "[data-shortcut-modal=\"settings\"]",
-	platform: "[data-shortcut-modal=\"platform\"]",
-	marker: "[data-voice-input]"
-};
-//#endregion
-//#region src/config.ts
-/** Configuration used when the file is missing, unreadable, or invalid. */
-const DEFAULT_CONFIG = {
-	allow: [],
-	disable: [],
-	triggers: [],
-	settingsPage: true,
-	revision: "",
-	profile: ""
-};
-/** Where the host half publishes the profile's configuration. */
-const CONFIG_URL = "/voice-anywhere/config.json";
-const TARGETS = new Set([
-	"question-card",
-	"dialog",
-	"shortcuts"
-]);
-let current = DEFAULT_CONFIG;
-/** @returns the configuration in force right now. */
-function currentConfig() {
-	return current;
-}
-/** Replace the configuration in force (loader and tests). */
-function setConfig(next) {
-	current = next;
-}
-/**
-* Parse an unknown payload into a configuration, dropping anything off-schema.
-* @param raw - parsed JSON body.
-* @returns a configuration that is always safe to use.
-*/
-function normalizeConfig(raw) {
-	if (typeof raw !== "object" || raw === null) return DEFAULT_CONFIG;
-	return {
-		allow: Array.isArray(raw.allow) ? raw.allow.filter((entry) => typeof entry === "string" && entry.trim() !== "") : [],
-		disable: Array.isArray(raw.disable) ? raw.disable.filter((entry) => typeof entry === "string" && TARGETS.has(entry)) : [],
-		triggers: Array.isArray(raw.triggers) ? raw.triggers.filter((entry) => typeof entry === "string" && entry.trim() !== "") : [],
-		settingsPage: raw.settingsPage !== false,
-		revision: typeof raw.revision === "string" ? raw.revision : "",
-		profile: typeof raw.profile === "string" ? raw.profile : ""
-	};
-}
-/**
-* Load the profile configuration once.
-*
-* A transport or parse failure rejects, so the caller can report it; the
-* configuration in force is left untouched, which means a broken host can never
-* widen what the plugin attaches to.
-* @param fetchImpl - fetch implementation, injectable for tests.
-* @returns the configuration now in force.
-* @throws when the route is unreachable or the body is not JSON.
-*/
-async function loadConfig(fetchImpl = fetch) {
-	const response = await fetchImpl(CONFIG_URL, { credentials: "same-origin" });
-	if (!response.ok) throw new Error(`configuration route answered ${response.status}`);
-	setConfig(normalizeConfig(await response.json()));
-	return current;
-}
-//#endregion
-//#region src/policy.ts
-/**
-* Whether a selector matches the element or one of its ancestors.
-* @param element - candidate editable.
-* @param selector - user-supplied selector.
-* @returns whether it matches; an invalid selector matches nothing.
-*/
-function matchesScope(element, selector) {
-	try {
-		return element.closest(selector) !== null;
-	} catch {
-		return false;
-	}
-}
-/**
-* Decide whether the control may appear for one surface.
-* @param element - the editable in question.
-* @param kind - surface family resolved by `surfaces.ts`.
-* @param config - configuration in force.
-* @returns whether the surface is visible to the plugin.
-*/
-function isSurfaceVisible(element, kind, config) {
-	if (element.closest(SELECTORS.settings) !== null || element.closest(SELECTORS.platform) !== null) return false;
-	if (kind === "shortcuts") return !config.disable.includes("shortcuts");
-	if (kind === "dialog" && document.querySelector(SELECTORS.settings) !== null) return false;
-	if (kind === "question-card") return !config.disable.includes("question-card");
-	if (kind === "dialog") return !config.disable.includes("dialog");
-	if (element.closest(SELECTORS.marker) !== null) return true;
-	return config.allow.some((selector) => matchesScope(element, selector));
-}
-//#endregion
-//#region src/targets.ts
-/** Input types that hold free text; numbers, dates, files and passwords are excluded on purpose. */
-const TEXT_INPUTS = new Set([
-	"text",
-	"search",
-	"url",
-	"tel",
-	"email"
-]);
-/** The composer owns its own microphone, so nothing inside it is ours. */
-const COMPOSER = "[data-composer-card]";
-/**
-* Ignore controls that are present but unusable: hidden inputs, zero-size
-* terminal and editor textareas, and anything the composer owns.
-* @param element - candidate control.
-* @returns whether the control can receive dictated text.
-*/
-function usable(element) {
-	const rect = element.getBoundingClientRect();
-	return rect.width >= 60 && rect.height >= 16 && element.getClientRects().length > 0;
-}
-/**
-* Classify the element that just received focus.
-* @param node - focus target, possibly a descendant of an editor.
-* @returns the editable to dictate into, or null when this element is not ours.
-*/
-function classify(node) {
-	if (!(node instanceof HTMLElement)) return null;
-	if (node.closest(COMPOSER)) return null;
-	if (node instanceof HTMLInputElement) {
-		if (!TEXT_INPUTS.has(node.type) || node.disabled || node.readOnly || !usable(node)) return null;
-		return {
-			element: node,
-			kind: "field"
-		};
-	}
-	if (node instanceof HTMLTextAreaElement) {
-		if (node.disabled || node.readOnly || !usable(node)) return null;
-		return {
-			element: node,
-			kind: "field"
-		};
-	}
-	const editor = node.closest("[contenteditable=\"true\"], [contenteditable=\"\"]");
-	if (editor instanceof HTMLElement && !editor.closest(COMPOSER) && usable(editor)) return {
-		element: editor,
-		kind: "editor"
-	};
-	return null;
-}
-/**
-* Write dictated text into a target at its caret.
-* @param target - editable captured when recording started.
-* @param text - transcript.
-* @returns whether the text landed in the target.
-*/
-function insertText(target, text) {
-	if (!target.element.isConnected) return false;
-	return target.kind === "field" ? insertField(target.element, text) : insertEditor(target.element, text);
-}
-/**
-* React controls read their value back from the DOM on the native `input`
-* event, so the prototype setter (which bypasses React's value tracker) plus
-* one bubbling event is the path that keeps the component's own state in sync.
-* @param element - input or textarea.
-* @param text - transcript.
-* @returns true after the event is dispatched.
-*/
-function insertField(element, text) {
-	const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-	const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
-	if (setter === void 0) return false;
-	const current = element.value;
-	const next = current + (current.length > 0 && !/\s$/u.test(current) ? " " : "") + text;
-	setter.call(element, next);
-	element.focus({ preventScroll: true });
-	const caret = next.length;
-	try {
-		element.setSelectionRange(caret, caret);
-	} catch {}
-	element.dispatchEvent(new Event("input", { bubbles: true }));
-	return true;
-}
-/**
-* Rich editors (Lexical among them) commit a `beforeinput` insertion in a
-* microtask, so a synchronous "unchanged" reading proves nothing: insert once,
-* and only a still-unchanged editor after three macrotasks gets one plain DOM
-* insert, which must not dispatch `input` or the text lands twice.
-* @param element - contenteditable host.
-* @param text - transcript.
-* @returns true after the first insertion attempt.
-*/
-function insertEditor(element, text) {
-	if (document.activeElement !== element) element.focus({ preventScroll: true });
-	const selection = document.getSelection();
-	if (selection !== null) {
-		const range = document.createRange();
-		range.selectNodeContents(element);
-		range.collapse(false);
-		selection.removeAllRanges();
-		selection.addRange(range);
-	}
-	const before = readEditor(element);
-	let executed = false;
-	try {
-		executed = document.execCommand("insertText", false, text);
-	} catch {
-		executed = false;
-	}
-	if (!executed) {
-		appendPlain(element, text);
-		return true;
-	}
-	setTimeout(() => setTimeout(() => setTimeout(() => {
-		if (element.isConnected && readEditor(element) === before) appendPlain(element, text);
-	}, 0), 0), 0);
-	return true;
-}
-/**
-* Read editor text without relying on layout.
-* @param element - contenteditable host.
-* @returns its current text.
-*/
-function readEditor(element) {
-	return element.innerText ?? element.textContent ?? "";
-}
-/**
-* Insert at the caret without touching the editor's event pipeline.
-* @param element - contenteditable host.
-* @param text - transcript.
-*/
-function appendPlain(element, text) {
-	const selection = document.getSelection();
-	const range = document.createRange();
-	const current = selection !== null && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-	if (current !== null && element.contains(current.endContainer)) {
-		range.setStart(current.endContainer, current.endOffset);
-		range.collapse(true);
-	} else {
-		range.selectNodeContents(element);
-		range.collapse(false);
-	}
-	range.insertNode(document.createTextNode(text));
-	const caret = document.createRange();
-	caret.selectNodeContents(element);
-	caret.collapse(false);
-	selection?.removeAllRanges();
-	selection?.addRange(caret);
-}
-//#endregion
-//#region src/surfaces.ts
-/**
-* Which surface the current focus belongs to.
-*
-* A surface is the smallest thing that decides both whether the microphone may
-* appear and where it goes: the official composer (never ours), the question
-* card, a dialog, the shortcut reference, or a plain field.
-*/
-/** Hosts worth scanning when nothing has focus; the card, every dialog, the reference. */
-const DOCK_HOSTS = `${SELECTORS.questionCard}, ${SELECTORS.dialog}, ${SELECTORS.shortcuts}`;
-/**
-* Find the first editable inside a host.
-* @param host - question card, dialog, or shortcut reference.
-* @returns the editable, or null when the host offers none.
-*/
-function fieldWithin(host) {
-	for (const element of host.querySelectorAll("textarea, input, [contenteditable=\"true\"], [contenteditable=\"\"]")) {
-		const found = classify(element);
-		if (found !== null) return {
-			element: found.element,
-			kind: found.kind
-		};
-	}
-	return null;
-}
-/**
-* Name the surface an editable belongs to.
-* @param element - the editable.
-* @param fieldKind - its classification.
-* @param focused - whether it holds focus.
-* @returns the resolved surface.
-*/
-function surfaceOf(element, fieldKind, focused) {
-	const card = element.closest(SELECTORS.questionCard);
-	if (card instanceof HTMLElement) return {
-		kind: "question-card",
-		focused,
-		host: card,
-		field: element,
-		fieldKind
-	};
-	const shortcuts = element.closest(SELECTORS.shortcuts);
-	if (shortcuts instanceof HTMLElement) return {
-		kind: "shortcuts",
-		focused,
-		host: shortcuts,
-		field: element,
-		fieldKind
-	};
-	const dialog = element.closest(SELECTORS.dialog);
-	if (dialog instanceof HTMLElement) return {
-		kind: "dialog",
-		focused,
-		host: dialog,
-		field: element,
-		fieldKind
-	};
-	return {
-		kind: "plain",
-		focused,
-		host: null,
-		field: element,
-		fieldKind
-	};
-}
-/**
-* Name a host scanned by selector, without asking the field for its ancestry.
-* @param host - element matched by `DOCK_HOSTS`.
-* @returns its surface kind.
-*/
-function kindOfHost(host) {
-	if (host.matches(SELECTORS.questionCard)) return "question-card";
-	if (host.matches(SELECTORS.shortcuts)) return "shortcuts";
-	if (host.matches(SELECTORS.dialog)) return "dialog";
-	return "plain";
-}
-/**
-* Resolve the surface that owns the control right now.
-*
-* Focus decides first. Without focus, only a host can carry the control, so the
-* highest host with an editable is considered — newest first, because dialogs
-* are appended to the body.
-* @param config - configuration in force.
-* @returns the visible surface, or null when nothing may show the control.
-*/
-function findSurface(config = currentConfig()) {
-	const focused = classify(document.activeElement);
-	if (focused !== null) {
-		const surface = surfaceOf(focused.element, focused.kind, true);
-		return isSurfaceVisible(surface.field, surface.kind, config) ? surface : null;
-	}
-	const hosts = document.querySelectorAll(DOCK_HOSTS);
-	for (let index = hosts.length - 1; index >= 0; index -= 1) {
-		const host = hosts[index];
-		const field = fieldWithin(host);
-		if (field === null) continue;
-		const surface = {
-			kind: kindOfHost(host),
-			focused: false,
-			host,
-			field: field.element,
-			fieldKind: field.kind
-		};
-		if (isSurfaceVisible(surface.field, surface.kind, config)) return surface;
-	}
-	return null;
-}
-//#endregion
-//#region src/activate.ts
-/**
-* The one activation both triggers share.
-*
-* A key, a mouse button and the official shortcut must agree on what "toggle
-* the microphone" means, so all three plan the same action here: stop whatever
-* is capturing, otherwise press whichever control the current focus owns.
-*/
-/** The composer card owns its own microphone; ancestry decides which one to press. */
-const COMPOSER_SCOPE = "[data-composer-card]";
-/** Frames to wait for the floating control to mount after we move focus. */
-const FOCUS_ATTEMPTS = 8;
-/**
-* Dictate into a field that does not have focus yet: move focus there, wait for
-* the floating control to mount, then press it exactly as a click would.
-* @param element - editable inside a visible host.
-*/
-function focusAndPress(element) {
-	element.focus({ preventScroll: true });
-	let attempts = 0;
-	const step = () => {
-		if (floatingControl.press()) return;
-		if (attempts < FOCUS_ATTEMPTS) {
-			attempts += 1;
-			requestAnimationFrame(step);
-		}
-	};
-	requestAnimationFrame(step);
-}
-/**
-* Plan the activation for this keypress or click.
-* @param target - the event target, when a shortcut supplies one.
-* @returns the action to run, or null when nothing should happen.
-*/
-/**
-* Record why an activation did or did not happen.
-* @param decision - branch that was taken and the states it was taken from.
-*/
-function note(decision) {
-	try {
-		window.__voiceAnywhere = {
-			...window.__voiceAnywhere,
-			activation: decision
-		};
-	} catch {}
-}
-function planActivation(target) {
-	const focused = target ?? document.activeElement;
-	const inComposer = focused instanceof Element && focused.closest(COMPOSER_SCOPE) !== null;
-	const composerState = composerControl.state();
-	const floatingState = floatingControl.state();
-	const states = {
-		focused: focused instanceof Element ? focused.tagName : String(focused),
-		inComposer,
-		composerState,
-		floatingState,
-		field: classify(focused) !== null
-	};
-	if (composerState === "recording") {
-		note({
-			...states,
-			branch: "composer-recording"
-		});
-		return () => {
-			composerControl.press();
-		};
-	}
-	if (floatingState === "recording") {
-		note({
-			...states,
-			branch: "floating-recording"
-		});
-		return () => {
-			floatingControl.press();
-		};
-	}
-	if (inComposer && composerState === "idle") {
-		note({
-			...states,
-			branch: "composer-idle"
-		});
-		return () => {
-			composerControl.press();
-		};
-	}
-	if (!inComposer && floatingState === "idle") {
-		note({
-			...states,
-			branch: "floating-idle"
-		});
-		return () => {
-			floatingControl.press();
-		};
-	}
-	if (floatingState === "none") {
-		if (classify(focused) !== null) {
-			note({
-				...states,
-				branch: "denied-field"
-			});
-			return null;
-		}
-		const surface = findSurface();
-		if (surface !== null) {
-			note({
-				...states,
-				branch: `surface:${surface.kind}`
-			});
-			return () => focusAndPress(surface.field);
-		}
-		note({
-			...states,
-			branch: "no-surface"
-		});
-	}
-	if (focused instanceof Element && (focused.closest(SELECTORS.settings) !== null || focused.closest(SELECTORS.platform) !== null)) {
-		note({
-			...states,
-			branch: "settings-context"
-		});
-		return null;
-	}
-	if (floatingState === "none" && composerState === "idle") {
-		note({
-			...states,
-			branch: "composer-fallback"
-		});
-		return () => {
-			composerControl.press();
-		};
-	}
-	note({
-		...states,
-		branch: "nothing"
-	});
-	return null;
-}
-//#endregion
-//#region src/capture-state.ts
-/**
-* Whether the settings page is recording a trigger.
-*
-* The engine must go quiet while a trigger is being recorded, otherwise the
-* very combination the user is adding would fire dictation on the way in.
-*/
-let capturing = false;
-/** @returns whether a trigger is being recorded right now. */
-function isCapturing() {
-	return capturing;
-}
-/**
-* Mark the recorder as active or idle.
-* @param value - whether the page is capturing.
-*/
-function setCapturing(value) {
-	capturing = value;
-}
-//#endregion
-//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/audio.ts
-/** Browser-owned microphone capture and native Web Audio resampling. */
-/** Capture failure whose message is localized by the caller. */
-var RecordingError = class extends Error {
-	kind;
-	constructor(kind) {
-		super(kind);
-		this.kind = kind;
-		this.name = "RecordingError";
-	}
-};
-/**
-* Encode mono floating-point samples as the canonical PCM16 WAV accepted by the Host.
-* @param samples - native-resampled 16 kHz mono samples.
-* @returns complete little-endian WAV bytes.
-*/
-function encodeWave(samples) {
-	const bytes = new Uint8Array(44 + samples.length * 2);
-	const view = new DataView(bytes.buffer);
-	const text = (at, value) => {
-		for (let i = 0; i < value.length; i++) bytes[at + i] = value.charCodeAt(i);
-	};
-	text(0, "RIFF");
-	view.setUint32(4, bytes.length - 8, true);
-	text(8, "WAVE");
-	text(12, "fmt ");
-	view.setUint32(16, 16, true);
-	view.setUint16(20, 1, true);
-	view.setUint16(22, 1, true);
-	view.setUint32(24, 16e3, true);
-	view.setUint32(28, 32e3, true);
-	view.setUint16(32, 2, true);
-	view.setUint16(34, 16, true);
-	text(36, "data");
-	view.setUint32(40, samples.length * 2, true);
-	for (const [i, sample] of samples.entries()) {
-		const value = Math.max(-1, Math.min(1, sample));
-		view.setInt16(44 + i * 2, Math.round(value * (value < 0 ? 32768 : 32767)), true);
-	}
-	return bytes;
-}
-/**
-* Encode the binary recording for the existing JSON Remote carrier.
-* @param bytes - complete recording.
-* @returns base64 with no data URL prefix.
-*/
-function audioBase64(bytes) {
-	let text = "";
-	for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode(...bytes.subarray(i, i + 8192));
-	return btoa(text);
-}
-/** One microphone acquisition, including a permission prompt that may settle after cancellation. */
-var Recording = class {
-	onDispose;
-	deviceId;
-	stream;
-	recorder;
-	context;
-	analyser;
-	samples = new Float32Array(256);
-	chunks = [];
-	lifetime = new AbortController();
-	disposal;
-	constructor(onDispose, deviceId = "") {
-		this.onDispose = onDispose;
-		this.deviceId = deviceId;
-	}
-	/**
-	* Acquire the selected microphone without recording or playing audio.
-	* @param onError - receives device interruptions before resource release completes.
-	* @returns after the level analyser starts; cancelled grants release their tracks immediately.
-	*/
-	async preview(onError) {
-		const devices = navigator.mediaDevices;
-		if (!devices) throw new RecordingError("unavailable");
-		let stream;
-		try {
-			stream = await devices.getUserMedia({
-				audio: {
-					echoCancellation: true,
-					noiseSuppression: true,
-					...this.deviceId === "" ? {} : { deviceId: { exact: this.deviceId } }
-				},
-				video: false
-			});
-		} catch (error) {
-			if (error instanceof DOMException) {
-				if (error.name === "NotAllowedError") throw new RecordingError("permission");
-				if (error.name === "NotFoundError" || error.name === "OverconstrainedError") throw new RecordingError("deviceMissing");
-			}
-			throw error;
-		}
-		if (this.lifetime.signal.aborted) {
-			stream.getTracks().forEach((track) => {
-				track.stop();
-			});
-			throw new RecordingError("cancelled");
-		}
-		this.stream = stream;
-		try {
-			this.context = new AudioContext();
-			this.analyser = this.context.createAnalyser();
-			this.analyser.fftSize = this.samples.length;
-			this.context.createMediaStreamSource(stream).connect(this.analyser);
-			for (const track of stream.getTracks()) track.addEventListener("ended", () => {
-				this.interrupted(onError);
-			}, { signal: this.lifetime.signal });
-		} catch (error) {
-			await this.dispose();
-			throw error;
-		}
-	}
-	/**
-	* Acquire the selected microphone and record audio for transcription.
-	* @param onError - receives failures during capture, before asynchronous resource release finishes.
-	* @returns after capture starts; a cancelled permission grant immediately releases its tracks.
-	*/
-	async start(onError) {
-		if (typeof MediaRecorder === "undefined") throw new RecordingError("unavailable");
-		await this.preview(onError);
-		if (this.lifetime.signal.aborted) throw new RecordingError("cancelled");
-		try {
-			this.recorder = new MediaRecorder(this.stream);
-			this.recorder.ondataavailable = (event) => {
-				if (!this.lifetime.signal.aborted && event.data.size > 0) this.chunks.push(event.data);
-			};
-			this.recorder.onerror = () => {
-				this.interrupted(onError);
-			};
-			this.recorder.start();
-		} catch (error) {
-			await this.dispose();
-			throw error;
-		}
-	}
-	interrupted(onError) {
-		if (this.lifetime.signal.aborted) return;
-		this.dispose().catch(() => void 0);
-		try {
-			onError?.(new RecordingError("interrupted"));
-		} catch (error) {
-			console.error("Speech recording error handler failed", error);
-		}
-	}
-	/**
-	* Read the live microphone signal.
-	* @returns the measured RMS level, or zero outside capture.
-	*/
-	amplitude() {
-		if (!this.analyser) return 0;
-		this.analyser.getFloatTimeDomainData(this.samples);
-		let sum = 0;
-		for (const sample of this.samples) sum += sample * sample;
-		return Math.sqrt(sum / this.samples.length);
-	}
-	/**
-	* Identify the input actually acquired by this operation.
-	* @returns the audio track's name and device group, or undefined outside capture.
-	*/
-	deviceInfo() {
-		const track = this.stream?.getAudioTracks()[0];
-		return track ? {
-			label: track.label,
-			groupId: track.getSettings().groupId ?? ""
-		} : void 0;
-	}
-	/**
-	* Finish capture and resample the recording.
-	* @param maxDurationSeconds - truncate timer overshoot to the Host limit.
-	* @returns one recording after the final MediaRecorder chunk arrives.
-	*/
-	async stop(maxDurationSeconds) {
-		const recorder = this.recorder;
-		const context = this.context;
-		if (!recorder || !context || recorder.state !== "recording") {
-			await this.dispose();
-			throw new RecordingError("empty");
-		}
-		try {
-			await new Promise((resolve, reject) => {
-				recorder.onstop = () => {
-					resolve();
-				};
-				recorder.onerror = () => {
-					reject(new RecordingError("empty"));
-				};
-				recorder.stop();
-			});
-			this.stream?.getTracks().forEach((track) => {
-				track.stop();
-			});
-			this.lifetime.signal.throwIfAborted();
-			const blob = new Blob(this.chunks, { type: recorder.mimeType });
-			if (blob.size === 0) throw new RecordingError("empty");
-			const decoded = await context.decodeAudioData(await blob.arrayBuffer());
-			this.lifetime.signal.throwIfAborted();
-			const offline = new OfflineAudioContext(1, Math.max(1, Math.floor(Math.min(decoded.duration, maxDurationSeconds) * 16e3)), 16e3);
-			const source = offline.createBufferSource();
-			source.buffer = decoded;
-			source.connect(offline.destination);
-			source.start();
-			const resampled = await offline.startRendering();
-			this.lifetime.signal.throwIfAborted();
-			return encodeWave(resampled.getChannelData(0));
-		} finally {
-			await this.dispose();
-		}
-	}
-	/**
-	* Release this recording and invalidate pending permission grants.
-	* @returns the shared release promise, including any AudioContext close failure.
-	*/
-	dispose() {
-		if (!this.disposal) {
-			const closing = Promise.withResolvers();
-			this.disposal = closing.promise;
-			this.release().then(closing.resolve, closing.reject);
-		}
-		return this.disposal;
-	}
-	async release() {
-		this.lifetime.abort(new RecordingError("cancelled"));
-		if (this.recorder?.state === "recording") this.recorder.stop();
-		this.stream?.getTracks().forEach((track) => {
-			track.stop();
-		});
-		this.stream = void 0;
-		const context = this.context;
-		this.context = void 0;
-		this.analyser = void 0;
-		this.chunks = [];
-		try {
-			if (context && context.state !== "closed") await context.close();
-		} finally {
-			this.onDispose();
-		}
-	}
-};
-//#endregion
-//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/failure-text.ts
-/**
-* Translate a capture or transcription failure.
-* @param failure - the rejected value.
-* @param t - the active voice-input translator.
-* @returns localized failure text.
-*/
-function failureText(failure, t) {
-	return failure instanceof RecordingError ? t(failure.kind) : t("failed", { message: failure instanceof Error ? failure.message : String(failure) });
-}
-//#endregion
-//#region \0voice-anywhere-css:/home/yanhongbin/deepseek-harness/packages/experimental/client-ui-voice-input/src/client/VoiceInput.module.css?va-module
-var VoiceInput_module_default = {
-	"inlineAction": "qU0WNq_inlineAction",
-	"progress": "qU0WNq_progress",
-	"setupEstimate": "qU0WNq_setupEstimate",
-	"deviceSelectMeter": "qU0WNq_deviceSelectMeter",
-	"preparationActions": "qU0WNq_preparationActions",
-	"steps": "qU0WNq_steps",
-	"stepProgress": "qU0WNq_stepProgress",
-	"deviceField": "qU0WNq_deviceField",
-	"deviceMeter": "qU0WNq_deviceMeter",
-	"deviceError": "qU0WNq_deviceError",
-	"inputLevel": "qU0WNq_inputLevel",
-	"sourceChoice": "qU0WNq_sourceChoice",
-	"activityMessage": "qU0WNq_activityMessage",
-	"waveform": "qU0WNq_waveform",
-	"triggerAnchor": "qU0WNq_triggerAnchor",
-	"roundButton": "qU0WNq_roundButton",
-	"preparationError": "qU0WNq_preparationError",
-	"summaryRow": "qU0WNq_summaryRow",
-	"summaryTitle": "qU0WNq_summaryTitle",
-	"downloadFailure": "qU0WNq_downloadFailure",
-	"preferences": "qU0WNq_preferences",
-	"captureRow": "qU0WNq_captureRow",
-	"preparation": "qU0WNq_preparation",
-	"deviceRow": "qU0WNq_deviceRow",
-	"settingsCard": "qU0WNq_settingsCard",
-	"stepBody": "qU0WNq_stepBody",
-	"metric": "qU0WNq_metric",
-	"trigger": "qU0WNq_trigger"
-};
-//#endregion
-//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/Waveform.tsx
-/** Live microphone amplitude history; animation updates SVG geometry without React state churn. */
-/** Render recent measured microphone levels; silent audio remains a dotted baseline. */
-function Waveform({ recording, label }) {
-	const svg = (0, react.useRef)(null);
-	(0, react.useEffect)(() => {
-		const bars = Array.from(svg.current.querySelectorAll("line")).reverse().map((element) => ({
-			element,
-			level: 0
-		}));
-		let frame, previous = -Infinity;
-		const draw = (now) => {
-			if (now - previous >= 50) {
-				previous = now;
-				let next = recording?.amplitude() ?? 0;
-				for (const bar of bars) {
-					const previousLevel = bar.level;
-					bar.level = next;
-					next = previousLevel;
-					const height = 1 + Math.min(1, bar.level * 5) * 17;
-					bar.element.setAttribute("y1", String(20 - height));
-					bar.element.setAttribute("y2", String(20 + height));
-				}
-			}
-			frame = requestAnimationFrame(draw);
-		};
-		frame = requestAnimationFrame(draw);
-		return () => {
-			cancelAnimationFrame(frame);
-		};
-	}, [recording]);
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
-		ref: svg,
-		className: VoiceInput_module_default.waveform,
-		viewBox: "0 0 640 40",
-		preserveAspectRatio: "none",
-		role: "img",
-		"aria-label": label,
-		children: Array.from({ length: 80 }, (_, index) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("line", {
-			x1: index * 8 + 4,
-			x2: index * 8 + 4,
-			y1: "19",
-			y2: "21",
-			stroke: "currentColor",
-			strokeWidth: "3",
-			strokeLinecap: "round",
-			opacity: .25 + index / 120
-		}, index))
-	});
-}
-//#endregion
-//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/VoiceSetupDialog.tsx
-/** Shared modal for voice activation and unavailable recognition. */
-/**
-* Guide activation or microphone clicks to the existing plugin details.
-* @param props - visibility, installation need and navigation callbacks.
-* @returns a dismissible prompt that never starts preparation or recording.
-*/
-function VoiceSetupDialog({ open, needsInstallation, onDismiss, onOpenDetails, t }) {
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
-		open,
-		title: t(needsInstallation ? "setupPrompt.title" : "setupPrompt.unavailableTitle"),
-		closeLabel: t("cancel"),
-		onClose: onDismiss,
-		description: t(needsInstallation ? "setupPrompt.body" : "setupPrompt.unavailableBody"),
-		footer: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-			variant: "ghost",
-			onClick: onDismiss,
-			children: t("setupPrompt.later")
-		}), onOpenDetails !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-			variant: "primary",
-			"data-modal-autofocus": true,
-			onClick: onOpenDetails,
-			children: t(needsInstallation ? "setupPrompt.open" : "setupPrompt.details")
-		})] })
-	});
-}
-//#endregion
-//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/VoiceInput.tsx
-/** Click-to-record toolbar activity; transcripts remain in the original Session draft. */
-async function disposeRecording(capture) {
-	try {
-		await capture.dispose();
-	} catch (_error) {}
-}
-/** Render a compact microphone or an expanded capture, transcription, or retry row. */
-function VoiceInput({ sessionId, inputActions, locked, onActiveChange, createRecording, transcribe, openSettings, useSpeechReadiness, usePluginNavigation, t }) {
-	const readiness = useSpeechReadiness((value) => value), catalog = readiness.catalog;
-	const navigable = usePluginNavigation((present) => present);
-	const provider = catalog?.providers.find((item) => item.id === catalog.selection.providerId);
-	const usable = readiness.connected && (provider?.preparation.phase === "ready" || provider?.preparation.phase === "standby" || provider?.preparation.phase === "waking");
-	const [phase, setPhase] = (0, react.useState)("idle"), [message, setMessage] = (0, react.useState)(""), [pending, setPending] = (0, react.useState)("");
-	const [setupOpen, setSetupOpen] = (0, react.useState)(false);
-	(0, react.useEffect)(() => {
-		if (usable) setSetupOpen(false);
-	}, [usable]);
-	const current = (0, react.useRef)(), generation = (0, react.useRef)(0);
-	const expanded = phase !== "idle";
-	(0, react.useLayoutEffect)(() => {
-		onActiveChange(expanded);
-		return () => {
-			onActiveChange(false);
-		};
-	}, [expanded, onActiveChange]);
-	const cancel = () => {
-		generation.current++;
-		const active = current.current;
-		current.current = void 0;
-		if (active) {
-			clearTimeout(active.timer);
-			active.abort.abort();
-			disposeRecording(active.capture);
-		}
-		setPending("");
-		setMessage("");
-		setPhase("idle");
-		setSetupOpen(false);
-	};
-	(0, react.useEffect)(() => {
-		setPending("");
-		setMessage("");
-		setPhase("idle");
-		setSetupOpen(false);
-		const blur = () => {
-			if (current.current?.phase === "recording") cancel();
-		};
-		const visibility = () => {
-			if (document.hidden && current.current && current.current.phase !== "transcribing") cancel();
-		};
-		const escape = (event) => {
-			if (event.key === "Escape" && current.current) {
-				event.preventDefault();
-				cancel();
-			}
-		};
-		window.addEventListener("blur", blur);
-		document.addEventListener("visibilitychange", visibility);
-		document.addEventListener("keydown", escape);
-		return () => {
-			window.removeEventListener("blur", blur);
-			document.removeEventListener("visibilitychange", visibility);
-			document.removeEventListener("keydown", escape);
-			generation.current++;
-			const active = current.current;
-			current.current = void 0;
-			if (active) {
-				clearTimeout(active.timer);
-				active.abort.abort();
-				disposeRecording(active.capture);
-			}
-		};
-	}, [sessionId]);
-	const feedback = (text) => {
-		setMessage(text);
-		setPhase("feedback");
-	};
-	const finish = async () => {
-		const active = current.current;
-		if (!active || active.phase !== "recording") return;
-		active.phase = "transcribing";
-		const run = generation.current;
-		clearTimeout(active.timer);
-		setPhase("transcribing");
-		try {
-			const audio = await active.capture.stop(active.maxDurationSeconds);
-			if (run !== generation.current) return;
-			if (audio.byteLength > active.maxAudioBytes) {
-				feedback(t("tooLarge"));
-				return;
-			}
-			const result = await transcribe({
-				audioBase64: audioBase64(audio),
-				...active.selection
-			}, active.abort.signal);
-			if (run !== generation.current) return;
-			if (!result.ok) {
-				feedback(t("failed", { message: result.error.message }));
-				return;
-			}
-			if (result.value.text === "") {
-				feedback(t("empty"));
-				return;
-			}
-			if (!inputActions.insertText(result.value.text, active.span)) {
-				setPending(result.value.text);
-				feedback(t("conflict"));
-				return;
-			}
-			setPhase("idle");
-		} catch (failure) {
-			await disposeRecording(active.capture);
-			if (run === generation.current) feedback(failureText(failure, t));
-		} finally {
-			if (run === generation.current) current.current = void 0;
-		}
-	};
-	const start = async () => {
-		if (!catalog || !usable || locked || current.current) return;
-		const run = ++generation.current;
-		const active = {
-			capture: createRecording(),
-			abort: new AbortController(),
-			span: inputActions.captureInsertion(),
-			selection: catalog.selection,
-			maxDurationSeconds: catalog.maxDurationSeconds,
-			maxAudioBytes: catalog.maxAudioBytes,
-			phase: "requesting"
-		};
-		current.current = active;
-		setMessage("");
-		setPending("");
-		setPhase("requesting");
-		try {
-			await active.capture.start((failure) => {
-				if (run !== generation.current || current.current !== active || active.phase === "transcribing") return;
-				current.current = void 0;
-				clearTimeout(active.timer);
-				active.abort.abort();
-				feedback(failureText(failure, t));
-			});
-			if (run !== generation.current || current.current !== active) return;
-			active.phase = "recording";
-			setPhase("recording");
-			active.timer = setTimeout(() => {
-				finish();
-			}, active.maxDurationSeconds * 1e3);
-		} catch (failure) {
-			await disposeRecording(active.capture);
-			if (run === generation.current) {
-				current.current = void 0;
-				feedback(failureText(failure, t));
-			}
-		}
-	};
-	if (!expanded) return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
-		label: t("dictate"),
-		disabled: !usable,
-		side: "top",
-		portal: true,
-		children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-			className: VoiceInput_module_default.triggerAnchor,
-			children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-				className: VoiceInput_module_default.trigger,
-				size: "sm",
-				disabled: locked,
-				"aria-label": t(usable ? "start" : "setupPrompt.trigger"),
-				"aria-haspopup": usable ? void 0 : "dialog",
-				onMouseDown: (event) => {
-					event.preventDefault();
-				},
-				onClick: () => {
-					if (usable) start();
-					else setSetupOpen(true);
-				},
-				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconMicrophoneOutlineRegular, { size: 18 })
-			})
-		})
-	}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(VoiceSetupDialog, {
-		open: setupOpen && !usable,
-		needsInstallation: readiness.connected && provider?.location === "host-local" && provider.preparation.phase === "unprepared",
-		onDismiss: () => {
-			setSetupOpen(false);
+		devices,
+		/** @returns one capture owned by this plugin's lifetime. */
+		createRecording: () => {
+			let recording;
+			recording = new Recording(() => {
+				live.delete(recording);
+			}, currentDeviceId());
+			live.add(recording);
+			return recording;
 		},
-		onOpenDetails: navigable ? () => {
-			setSetupOpen(false);
-			openSettings();
-		} : void 0,
-		t
-	})] });
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-		className: VoiceInput_module_default.captureRow,
-		"data-voice-activity": phase,
-		children: [
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-				type: "button",
-				className: VoiceInput_module_default.roundButton,
-				size: "sm",
-				"aria-label": t(pending ? "discard" : "cancel"),
-				onClick: cancel,
-				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconCloseOutlineRegular, { size: 14 })
-			}),
-			phase === "recording" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Waveform, {
-				recording: current.current?.capture,
-				label: t("recording")
-			}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-				className: VoiceInput_module_default.activityMessage,
-				role: "status",
-				title: pending || message,
-				children: [(phase === "requesting" || phase === "transcribing") && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.StateDot, { state: "ongoing" }), phase === "feedback" ? message : t(phase === "requesting" ? "requesting" : provider?.preparation.phase === "waking" ? "wakingShort" : "transcribingShort")]
-			}),
-			phase === "recording" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-				type: "button",
-				className: VoiceInput_module_default.roundButton,
-				size: "sm",
-				"aria-label": t("stop"),
-				onClick: () => {
-					finish();
-				},
-				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconStopFillRegular, { size: 14 })
-			}),
-			phase === "feedback" && (pending ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-				className: VoiceInput_module_default.inlineAction,
-				size: "sm",
-				type: "button",
-				onClick: () => {
-					if (inputActions.insertText(pending, inputActions.captureInsertion())) {
-						setPending("");
-						setPhase("idle");
-					}
-				},
-				children: t("insert")
-			}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-				className: VoiceInput_module_default.roundButton,
-				size: "sm",
-				type: "button",
-				"aria-label": t("retryRecording"),
-				disabled: !usable || locked,
-				onClick: () => {
-					start();
-				},
-				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconMicrophoneOutlineRegular, { size: 18 })
-			}))
-		]
-	});
-}
-//#endregion
-//#region src/placement.ts
-const BUTTON_SIZE = 30;
-const ACTION_GAP = 8;
-const MIN_ROW_WIDTH = 120;
-/** Buttons within this vertical distance belong to one visual row. */
-const CELL_TOLERANCE = 6;
-/** Buttons closer than this horizontally belong to one cluster. */
-const CLUSTER_GAP = 24;
-/** An action row has at least this many buttons. */
-const MIN_ACTION_BUTTONS = 2;
-/**
-* Group the host's visible buttons into rows and return the rightmost cluster
-* of its lowest row. The question pager's chevrons sit far from the footer
-* actions, so the cluster split keeps them out automatically.
-* @param host - question card or dialog.
-* @returns the cluster, or null when the host has no action row.
-*/
-function actionCluster(host) {
-	const items = [...host.querySelectorAll("button")].map((element) => ({
-		element,
-		rect: element.getBoundingClientRect()
-	})).filter((item) => item.rect.width > 0 && item.rect.height > 0);
-	if (items.length === 0) return null;
-	const rows = [];
-	for (const item of [...items].sort((left, right) => left.rect.top - right.rect.top)) {
-		const row = rows.find((candidate) => Math.abs(candidate.top - item.rect.top) <= CELL_TOLERANCE);
-		if (row !== void 0) row.items.push(item);
-		else rows.push({
-			top: item.rect.top,
-			items: [item]
-		});
-	}
-	const lowest = rows[rows.length - 1];
-	const clusters = [];
-	for (const item of [...lowest.items].sort((left, right) => left.rect.left - right.rect.left)) {
-		const current = clusters[clusters.length - 1];
-		const last = current?.[current.length - 1];
-		if (current !== void 0 && last !== void 0 && item.rect.left - last.rect.right <= CLUSTER_GAP) current.push(item);
-		else clusters.push([item]);
-	}
-	const cluster = clusters[clusters.length - 1];
-	const first = cluster?.[0];
-	const parent = first?.element.parentElement;
-	if (cluster === void 0 || cluster.length < MIN_ACTION_BUTTONS || first === void 0 || parent === null || parent === void 0) return null;
-	const top = Math.min(...cluster.map((item) => item.rect.top));
-	const bottom = Math.max(...cluster.map((item) => item.rect.bottom));
-	return {
-		left: Math.min(...cluster.map((item) => item.rect.left)),
-		top,
-		height: bottom - top,
-		parent
-	};
-}
-/**
-* Bound the docked row on the left by what the row already shows.
-* @param rowElement - the action cluster's grandparent row (holds the pager).
-* @param band - the action row's vertical band.
-* @param right - the row's right edge.
-* @returns the leftmost usable x.
-*/
-function leftBoundary(rowElement, band, right) {
-	const rowRect = rowElement.getBoundingClientRect();
-	let left = rowRect.left + ACTION_GAP;
-	for (const child of [...rowElement.children]) {
-		if (!(child instanceof HTMLElement)) continue;
-		const rect = child.getBoundingClientRect();
-		if (rect.width <= 0 || rect.height <= 0 || rect.right > right) continue;
-		if (rect.width > rowRect.width * .5) continue;
-		if (rect.bottom < band.top - 10 || rect.top > band.bottom + 10) continue;
-		left = Math.max(left, rect.right + ACTION_GAP);
-	}
-	return left;
-}
-/**
-* Dock the control into a host's action row.
-* @param host - question card or dialog.
-* @param expanded - whether the capture row is showing.
-* @returns the box, or null when the host has no usable action row.
-*/
-function dockBox(host, expanded) {
-	const cluster = actionCluster(host);
-	if (cluster === null) return null;
-	const right = cluster.left - ACTION_GAP;
-	const left = leftBoundary(cluster.parent.parentElement ?? cluster.parent, {
-		top: cluster.top,
-		bottom: cluster.top + cluster.height
-	}, right);
-	const top = cluster.top + cluster.height / 2;
-	if (expanded) {
-		if (right - left < MIN_ROW_WIDTH) return null;
-		return {
-			left,
-			top,
-			width: right - left
-		};
-	}
-	return {
-		left: right - BUTTON_SIZE,
-		top,
-		width: BUTTON_SIZE
-	};
-}
-/**
-* Follow the field itself.
-* @param element - the focused editable.
-* @param expanded - whether the capture row is showing.
-* @returns the box, or null when the field has no usable geometry.
-*/
-function fieldBox(element, expanded) {
-	const rect = element.getBoundingClientRect();
-	if (rect.width < 60 || rect.height < 16) return null;
-	if (!expanded) return {
-		left: Math.max(8, Math.min(rect.right - BUTTON_SIZE - 4, window.innerWidth - BUTTON_SIZE - 6)),
-		top: rect.top + rect.height / 2,
-		width: BUTTON_SIZE
-	};
-	const width = Math.max(160, Math.min(rect.width, window.innerWidth - 16));
-	return {
-		left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
-		top: rect.top + rect.height / 2,
-		width
-	};
-}
-/**
-* Resolve the placement for one surface.
-* @param surface - resolved surface.
-* @param expanded - whether the capture row is showing.
-* @returns the box and the scheme used, or null when nothing can be shown.
-*/
-function placementFor(surface, expanded) {
-	if (surface.kind === "plain") {
-		const box = fieldBox(surface.field, expanded);
-		return box === null ? null : {
-			box,
-			mode: "field"
-		};
-	}
-	const docked = surface.host === null ? null : dockBox(surface.host, expanded);
-	if (docked !== null) return {
-		box: docked,
-		mode: "dock"
-	};
-	if (!surface.focused) return null;
-	const box = fieldBox(surface.field, expanded);
-	return box === null ? null : {
-		box,
-		mode: "field"
-	};
-}
-/**
-* Report the numbers behind a dock decision, for diagnostics.
-* @param host - question card or dialog.
-* @returns cluster geometry and the resulting band.
-*/
-function dockProbe(host) {
-	const cluster = actionCluster(host);
-	if (cluster === null) return { host: "no-action-row" };
-	const right = cluster.left - ACTION_GAP;
-	const rowElement = cluster.parent.parentElement ?? cluster.parent;
-	const left = leftBoundary(rowElement, {
-		top: cluster.top,
-		bottom: cluster.top + cluster.height
-	}, right);
-	return {
-		actionLeft: Math.round(cluster.left),
-		right: Math.round(right),
-		left: Math.round(left),
-		width: Math.round(right - left),
-		band: Math.round(cluster.top),
-		children: [...rowElement.children].map((child) => ({
-			right: Math.round(child.getBoundingClientRect().right),
-			width: Math.round(child.getBoundingClientRect().width)
-		}))
-	};
-}
-//#endregion
-//#region src/FloatingMic.ts
-/**
-* The floating microphone: the official component, placed next to the focused
-* field or docked into the footer of an open dialog.
-*
-* Nothing about the button, its capture row or its feedback is reimplemented.
-* This file only decides which editable a transcript belongs to, where the
-* control sits, and when it goes away.
-*
-* Two placements, one control:
-* - an editable on the page: the control follows that field's right edge;
-* - a dialog with a text field: the control docks in the dialog's footer, in
-*   the space left of the action buttons, and stretches across it. That keeps
-*   it visible from the moment the dialog opens (no focus required) and stops
-*   the capture row from being squeezed into a few hundred pixels next to a
-*   narrow field.
-*/
-/** The component only uses the id to reset its capture state. */
-const FIXED_SESSION = "voice-anywhere";
-const SYNC_MS = 300;
-/**
-* Copy as the last resort so a transcript is never lost when its field closed.
-* @param text - transcript.
-*/
-function copyToClipboard(text) {
-	navigator.clipboard?.writeText(text).catch(() => void 0);
-}
-/**
-* Render the official microphone where the current editable needs it.
-* @param props - injected speech face, synthesized readiness hooks, translator.
-* @returns the portal, or null while no editable is available.
-*/
-function FloatingMic(props) {
-	const { createRecording, transcribe, openSettings, prepare, cancelPreparation, configure, selectMicrophone, refreshReadiness, useSpeechReadiness, useMicrophoneDevice, usePluginNavigation, t } = props;
-	const [target, setTarget] = (0, react.useState)(null);
-	const [box, setBox] = (0, react.useState)(null);
-	const [expanded, setExpanded] = (0, react.useState)(false);
-	const [locked, setLocked] = (0, react.useState)(false);
-	const [mode, setMode] = (0, react.useState)("field");
-	const expandedRef = (0, react.useRef)(false);
-	const rootRef = (0, react.useRef)(null);
-	const signature = (0, react.useRef)("");
-	const syncRef = (0, react.useRef)(() => {});
-	const identity = (0, react.useRef)(/* @__PURE__ */ new WeakMap());
-	const identities = (0, react.useRef)(0);
-	const identityOf = (element) => {
-		const known = identity.current.get(element);
-		if (known !== void 0) return known;
-		identities.current += 1;
-		identity.current.set(element, identities.current);
-		return identities.current;
-	};
-	expandedRef.current = expanded;
-	(0, react.useEffect)(() => {
-		const sync = () => {
-			const surface = findSurface();
-			let next = null;
-			let placement = null;
-			let resolvedMode = "field";
-			if (surface !== null) {
-				next = {
-					element: surface.field,
-					kind: surface.fieldKind
-				};
-				const resolved = placementFor(surface, expandedRef.current);
-				placement = resolved?.box ?? null;
-				resolvedMode = resolved?.mode ?? "field";
-				if (surface.host !== null) window.__voiceAnywhere = {
-					...window.__voiceAnywhere,
-					dock: {
-						kind: surface.kind,
-						focused: surface.focused,
-						...dockProbe(surface.host)
-					}
-				};
-				window.__voiceAnywhere = {
-					...window.__voiceAnywhere,
-					last: {
-						expanded: expandedRef.current,
-						kind: surface.kind,
-						focused: surface.focused,
-						box: placement === null ? null : {
-							left: Math.round(placement.left),
-							top: Math.round(placement.top),
-							width: Math.round(placement.width)
-						}
-					}
-				};
-			}
-			if (next !== null && !next.element.isConnected && !expandedRef.current) {
-				next = null;
-				placement = null;
-			}
-			if (expandedRef.current && (next === null || placement === null)) return;
-			const key = next === null || placement === null ? "" : `${resolvedMode}|${placement.left}|${placement.top}|${placement.width}|${identityOf(next.element)}`;
-			if (key !== signature.current) {
-				signature.current = key;
-				setTarget(next);
-				setBox(placement);
-				setMode(resolvedMode);
-			}
-			setLocked(hasForeignRecording(rootRef.current));
-		};
-		syncRef.current = sync;
-		sync();
-		refreshReadiness();
-		document.addEventListener("focusin", sync, true);
-		document.addEventListener("focusout", sync, true);
-		window.addEventListener("scroll", sync, true);
-		window.addEventListener("resize", sync);
-		const timer = window.setInterval(sync, SYNC_MS);
-		return () => {
-			document.removeEventListener("focusin", sync, true);
-			document.removeEventListener("focusout", sync, true);
-			window.removeEventListener("scroll", sync, true);
-			window.removeEventListener("resize", sync);
-			window.clearInterval(timer);
-			syncRef.current = () => {};
-		};
-	}, [refreshReadiness]);
-	(0, react.useEffect)(() => {
-		const element = target?.element ?? null;
-		if (element === null) return void 0;
-		if (expanded && mode === "field") element.setAttribute("data-voice-anywhere-capturing", "");
-		else element.removeAttribute("data-voice-anywhere-capturing");
-		return () => {
-			element.removeAttribute("data-voice-anywhere-capturing");
-		};
-	}, [
-		target,
-		expanded,
-		mode
-	]);
-	(0, react.useLayoutEffect)(() => {
-		syncRef.current();
-	}, [expanded]);
-	if (target === null || box === null) return null;
-	return (0, react_dom.createPortal)((0, react.createElement)("div", {
-		"data-voice-anywhere-root": "",
-		ref: rootRef,
-		style: {
-			position: "fixed",
-			left: `${box.left}px`,
-			top: `${box.top}px`,
-			width: `${box.width}px`,
-			transform: "translateY(-50%)",
-			display: "flex",
-			alignItems: "center",
-			justifyContent: "center",
-			zIndex: 1050,
-			pointerEvents: "none"
+		/** Release every capture still open when the plugin unloads. */
+		dispose: () => {
+			for (const recording of live) recording.dispose();
+			live.clear();
 		}
-	}, (0, react.createElement)("div", { style: {
-		pointerEvents: "auto",
-		width: "100%",
-		display: "flex",
-		alignItems: "center",
-		justifyContent: "center",
-		boxSizing: "border-box"
-	} }, (0, react.createElement)(VoiceInput, {
-		sessionId: FIXED_SESSION,
-		inputActions: {
-			captureInsertion: () => target.element.isConnected ? {
-				element: target.element,
-				kind: target.kind
-			} : null,
-			insertText: (text, span) => {
-				if (span !== null) return span.element.isConnected && insertText({
-					element: span.element,
-					kind: span.kind
-				}, text);
-				copyToClipboard(text);
-				return true;
-			}
-		},
-		locked,
-		onActiveChange: setExpanded,
-		createRecording,
-		transcribe,
-		openSettings,
-		prepare,
-		cancelPreparation,
-		configure,
-		selectMicrophone,
-		useSpeechReadiness,
-		useMicrophoneDevice,
-		usePluginNavigation,
-		t
-	}))), document.body);
+	};
 }
 //#endregion
 //#region src/storage.ts
@@ -2519,6 +2754,8 @@ function FloatingMic(props) {
 * triggers are per client, so a profile edit cannot silently overwrite them.
 */
 const TRIGGERS_KEY = "dsh.voice-anywhere.triggers";
+/** Shape version of the stored value; a legacy bare array is migrated on read. */
+const STORAGE_VERSION = 1;
 const CLOSED_KEY = "dsh.voice-anywhere.settings-closed";
 /**
 * Key for one profile's close mark; a shared origin must not let one profile
@@ -2536,14 +2773,21 @@ function closedKey(profile) {
 */
 function loadTriggerText(fallback) {
 	try {
-		const raw = localStorage.getItem(TRIGGERS_KEY);
-		if (raw === null) return [...fallback];
-		const parsed = JSON.parse(raw);
-		if (!Array.isArray(parsed)) return [...fallback];
-		return parsed.filter((entry) => typeof entry === "string");
+		return parseStored(localStorage.getItem(TRIGGERS_KEY)) ?? [...fallback];
 	} catch {
 		return [...fallback];
 	}
+}
+/**
+* Parse a stored value, accepting both shapes.
+* @param raw - raw storage text, or null when nothing was stored.
+* @returns the trigger list, or null when the value is absent or unusable.
+*/
+function parseStored(raw) {
+	if (raw === null) return null;
+	const parsed = JSON.parse(raw);
+	const list = Array.isArray(parsed) ? parsed : parsed !== null && typeof parsed === "object" && Array.isArray(parsed.triggers) ? parsed.triggers : null;
+	return list === null ? null : list.filter((entry) => typeof entry === "string");
 }
 /**
 * Persist the chosen triggers.
@@ -2551,7 +2795,10 @@ function loadTriggerText(fallback) {
 */
 function saveTriggerText(values) {
 	try {
-		localStorage.setItem(TRIGGERS_KEY, JSON.stringify(values));
+		localStorage.setItem(TRIGGERS_KEY, JSON.stringify({
+			v: STORAGE_VERSION,
+			triggers: [...values]
+		}));
 	} catch {}
 }
 /**
@@ -2577,7 +2824,43 @@ function closePage(revision, profile) {
 	} catch {}
 }
 //#endregion
-//#region src/triggers.ts
+//#region src/settings/styles.ts
+/**
+* Inline spacing for the settings page.
+*
+* The component describes behaviour; the numbers live here so the layout can be
+* read (and changed) without scanning the render tree.
+*/
+const STYLE = {
+	page: {
+		display: "flex",
+		flexDirection: "column",
+		gap: "14px",
+		padding: "4px 0"
+	},
+	hint: {
+		margin: 0,
+		opacity: .72
+	},
+	list: {
+		display: "flex",
+		flexDirection: "column",
+		gap: "8px"
+	},
+	row: {
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "space-between",
+		gap: "12px"
+	},
+	actions: {
+		display: "flex",
+		gap: "8px",
+		flexWrap: "wrap"
+	}
+};
+//#endregion
+//#region src/trigger/expression.ts
 const MODIFIER_NAMES = {
 	ctrl: "ctrl",
 	control: "ctrl",
@@ -2730,49 +3013,6 @@ function matchesKey(trigger, event) {
 function matchesMouse(trigger, event) {
 	return trigger.kind === "mouse" && event.button === trigger.button;
 }
-/**
-* Listen for the configured triggers.
-* @param host - trigger source and the action to run.
-* @returns the removal function.
-*/
-function startTriggers(host) {
-	const onKeyDown = (event) => {
-		if (event.repeat || event.isComposing) return;
-		if (event.getModifierState?.("AltGraph") === true) return;
-		for (const trigger of host.triggers()) {
-			if (!matchesKey(trigger, event)) continue;
-			event.preventDefault();
-			event.stopPropagation();
-			host.fire();
-			return;
-		}
-	};
-	const onMouseDown = (event) => {
-		for (const trigger of host.triggers()) {
-			if (!matchesMouse(trigger, event)) continue;
-			event.preventDefault();
-			event.stopPropagation();
-			host.fire();
-			return;
-		}
-	};
-	const onAuxClick = (event) => {
-		for (const trigger of host.triggers()) {
-			if (!matchesMouse(trigger, event)) continue;
-			event.preventDefault();
-			event.stopPropagation();
-			return;
-		}
-	};
-	window.addEventListener("keydown", onKeyDown, true);
-	window.addEventListener("mousedown", onMouseDown, true);
-	window.addEventListener("auxclick", onAuxClick, true);
-	return () => {
-		window.removeEventListener("keydown", onKeyDown, true);
-		window.removeEventListener("mousedown", onMouseDown, true);
-		window.removeEventListener("auxclick", onAuxClick, true);
-	};
-}
 /** Modifier keys produce no expression of their own. */
 const MODIFIER_CODES = new Set([
 	"ShiftLeft",
@@ -2809,7 +3049,7 @@ function expressionOf(event) {
 	return parseTrigger(expression) === null ? null : expression;
 }
 //#endregion
-//#region src/settings-page.ts
+//#region src/settings/section.ts
 /**
 * The plugin's own settings page.
 *
@@ -2818,35 +3058,6 @@ function expressionOf(event) {
 * what may be recorded into, which keeps this page from becoming a second,
 * silently divergent policy editor.
 */
-/** Row and button spacing, kept local so the page adds no global CSS. */
-const STYLE = {
-	page: {
-		display: "flex",
-		flexDirection: "column",
-		gap: "14px",
-		padding: "4px 0"
-	},
-	hint: {
-		margin: 0,
-		opacity: .72
-	},
-	list: {
-		display: "flex",
-		flexDirection: "column",
-		gap: "8px"
-	},
-	row: {
-		display: "flex",
-		alignItems: "center",
-		justifyContent: "space-between",
-		gap: "12px"
-	},
-	actions: {
-		display: "flex",
-		gap: "8px",
-		flexWrap: "wrap"
-	}
-};
 /**
 * Render the trigger editor.
 * @param props - translator and the callback that removes the page again.
@@ -2913,73 +3124,6 @@ function SettingsSection(props) {
 		variant: "outline",
 		onClick: close
 	}, t("settings.close"))), message === "" ? null : (0, react.createElement)("p", { style: STYLE.hint }, message));
-}
-//#endregion
-//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/microphone-device.ts
-/** Browser-local microphone preference shared by settings previews and dictation. */
-/**
-* Restore the browser preference independently of Host recognition settings.
-* @returns validated device selection, persisted through the shared Client store.
-*/
-function createMicrophoneDeviceStore() {
-	const store = (0, _deepseek_ai_dsh_client_store.createSnapshotStore)({
-		id: "",
-		label: ""
-	}, { persist: { name: "dsh.voice-input.microphone" } });
-	const saved = store.getSnapshot();
-	if (!saved || typeof saved !== "object" || !("id" in saved) || typeof saved.id !== "string" || !("label" in saved) || typeof saved.label !== "string") store.set({
-		id: "",
-		label: ""
-	});
-	return store;
-}
-//#endregion
-//#region src/recording.ts
-/**
-* Microphone capture, reused from the official client source.
-*
-* `Recording` owns permission, MediaRecorder and the 16 kHz mono WAV encoding
-* the Host validates, so duplicating it would only add a way to drift from the
-* official button. The device preference is the one the official picker saved:
-* it is re-read on every capture because that picker writes the same key.
-*/
-/** Persistence key owned by the official microphone picker. */
-const DEVICE_KEY = "dsh.voice-input.microphone";
-function createRecorder() {
-	const devices = createMicrophoneDeviceStore();
-	const live = /* @__PURE__ */ new Set();
-	/**
-	* Read the currently chosen microphone; the store is only a fallback because
-	* another plugin instance may have written the key after we mounted.
-	* @returns a device id, or an empty string for the system default.
-	*/
-	const currentDeviceId = () => {
-		try {
-			const saved = JSON.parse(localStorage.getItem(DEVICE_KEY) ?? "null");
-			if (saved !== null && typeof saved === "object" && "id" in saved) {
-				const id = saved.id;
-				if (typeof id === "string") return id;
-			}
-		} catch {}
-		return devices.getSnapshot().id;
-	};
-	return {
-		devices,
-		/** @returns one capture owned by this plugin's lifetime. */
-		createRecording: () => {
-			let recording;
-			recording = new Recording(() => {
-				live.delete(recording);
-			}, currentDeviceId());
-			live.add(recording);
-			return recording;
-		},
-		/** Release every capture still open when the plugin unloads. */
-		dispose: () => {
-			for (const recording of live) recording.dispose();
-			live.clear();
-		}
-	};
 }
 //#endregion
 //#region src/speech.ts
@@ -3207,97 +3351,71 @@ function registerShortcut(ctx, t, report) {
 	}
 }
 //#endregion
+//#region src/trigger/engine.ts
+/**
+* The trigger engine: the one place that subscribes to keyboard and mouse
+* events, and hands a match to the shared activation.
+*/
+/**
+* Listen for the configured triggers.
+* @param host - trigger source and the action to run.
+* @returns the removal function.
+*/
+function startTriggers(host) {
+	const onKeyDown = (event) => {
+		if (event.repeat || event.isComposing) return;
+		if (event.getModifierState?.("AltGraph") === true) return;
+		for (const trigger of host.triggers()) {
+			if (!matchesKey(trigger, event)) continue;
+			event.preventDefault();
+			event.stopPropagation();
+			host.fire();
+			return;
+		}
+	};
+	const onMouseDown = (event) => {
+		for (const trigger of host.triggers()) {
+			if (!matchesMouse(trigger, event)) continue;
+			event.preventDefault();
+			event.stopPropagation();
+			host.fire();
+			return;
+		}
+	};
+	const onAuxClick = (event) => {
+		for (const trigger of host.triggers()) {
+			if (!matchesMouse(trigger, event)) continue;
+			event.preventDefault();
+			event.stopPropagation();
+			return;
+		}
+	};
+	window.addEventListener("keydown", onKeyDown, true);
+	window.addEventListener("mousedown", onMouseDown, true);
+	window.addEventListener("auxclick", onAuxClick, true);
+	return () => {
+		window.removeEventListener("keydown", onKeyDown, true);
+		window.removeEventListener("mousedown", onMouseDown, true);
+		window.removeEventListener("auxclick", onAuxClick, true);
+	};
+}
+//#endregion
 //#region src/client.ts
 /**
 * Composition root.
 *
 * The plugin owns three things and nothing else: the readiness mirror of the
 * official speech service, the floating instance of the official microphone,
-* and the one shortcut that presses whichever microphone the focus points at.
-* It declares no runtime dependency on any official package: the button and the
+* and the triggers that press whichever microphone the focus points at. It
+* declares no runtime dependency on any official package: the button and the
 * capture pipeline are compiled into this artifact by `build.mjs`.
 */
-const NS = "voice-anywhere";
-const VOICE_BUNDLE = "@deepseek-ai/dsh-experimental-voice-input-bundle";
-const MAX_EVENTS = 50;
-/** One command label per shipped locale, so the shortcut list never falls back to a key name. */
-const COMMAND_LABEL = {
-	zh: "任意输入框语音输入",
-	en: "Voice input in any text field",
-	ja: "任意の入力欄で音声入力",
-	es: "Dictado en cualquier campo de texto",
-	fr: "Dictée dans n’importe quel champ",
-	de: "Spracheingabe in jedem Textfeld",
-	ru: "Голосовой ввод в любом поле",
-	pt: "Ditado em qualquer campo de texto"
-};
-/** The settings page's own copy, as flat keys — the locale service indexes dicts literally. */
-const SETTINGS_TEXT = {
-	zh: {
-		"settings.label": "语音输入",
-		"settings.hint": "在这里添加触发键（键盘组合或鼠标键）。官方快捷键列表里的组合仍然有效，两者并存。",
-		"settings.empty": "还没有自定义触发键。",
-		"settings.capture": "录制按键",
-		"settings.capturing": "请按下按键或鼠标键…",
-		"settings.captured": "已添加：",
-		"settings.rejected": "这个组合无法用作触发键：",
-		"settings.remove": "删除",
-		"settings.close": "关闭此设置页"
-	},
-	en: {
-		"settings.label": "Voice input",
-		"settings.hint": "Add triggers (a key combination or a mouse button). Combinations in the official shortcut list keep working; both run side by side.",
-		"settings.empty": "No custom trigger yet.",
-		"settings.capture": "Record a trigger",
-		"settings.capturing": "Press a key or a mouse button…",
-		"settings.captured": "Added:",
-		"settings.rejected": "That combination cannot be a trigger:",
-		"settings.remove": "Remove",
-		"settings.close": "Close this page"
-	}
-};
-const DICTS = {
-	zh: {
-		...zh,
-		command: COMMAND_LABEL.zh,
-		...SETTINGS_TEXT.zh
-	},
-	en: {
-		...en,
-		command: COMMAND_LABEL.en,
-		...SETTINGS_TEXT.en
-	},
-	ja: {
-		...ja,
-		command: COMMAND_LABEL.ja,
-		...SETTINGS_TEXT.en
-	},
-	es: {
-		...es,
-		command: COMMAND_LABEL.es,
-		...SETTINGS_TEXT.en
-	},
-	fr: {
-		...fr,
-		command: COMMAND_LABEL.fr,
-		...SETTINGS_TEXT.en
-	},
-	de: {
-		...de,
-		command: COMMAND_LABEL.de,
-		...SETTINGS_TEXT.en
-	},
-	ru: {
-		...ru,
-		command: COMMAND_LABEL.ru,
-		...SETTINGS_TEXT.en
-	},
-	pt: {
-		...pt,
-		command: COMMAND_LABEL.pt,
-		...SETTINGS_TEXT.en
-	}
-};
+/** Rules this plugin adds on top of the reused stylesheet. */
+const EXTRA_CSS = `
+/* While a plain field is being recorded, the row replaces its text. */
+[data-voice-anywhere-capturing] { color: transparent !important; caret-color: transparent !important; }
+[data-voice-anywhere-capturing]::placeholder { color: transparent !important; }
+`;
 /** Services the plugin cannot work without; Cordis parks it until they exist. */
 const inject = [
 	"slots",
@@ -3305,64 +3423,26 @@ const inject = [
 	"shortcuts"
 ];
 /**
-* Mount the floating microphone and its shortcut.
+* Report one failure through the shared diagnostics surface.
+* @param kind - failing step.
+* @param error - thrown value.
+*/
+function fail(kind, error) {
+	report(kind, error);
+}
+/**
+* Mount the floating microphone, its triggers and its settings page.
 * @param ctx - client plugin context.
 */
 function apply(ctx) {
-	const events = [];
-	const report = (kind, error) => {
-		const message = error instanceof Error ? error.message : String(error);
-		events.push({
-			kind,
-			message,
-			at: (/* @__PURE__ */ new Date()).toISOString()
-		});
-		if (events.length > MAX_EVENTS) events.shift();
-		console.warn(`[voice-anywhere] ${kind}: ${message}`);
-	};
-	window.__voiceAnywhere = {
-		build: _voice_anywhere_build_default,
-		events
-	};
+	installDiagnostics({ build: _voice_anywhere_build_default });
 	try {
-		const t = ctx.locale.bind(NS);
-		ctx.effect(() => ctx.locale.register(NS, DICTS));
-		ctx.effect(() => {
-			let section = null;
-			let cancelled = false;
-			loadConfig().then((config) => {
-				if (cancelled || !config.settingsPage || isPageClosed(config.revision, config.profile)) return;
-				section = ctx.slots.inject("settings.section", () => ctx.slots.register({
-					name: "settings.section",
-					id: "voice-anywhere",
-					order: 70,
-					locale: NS,
-					label: () => t("settings.label")
-				}, () => (0, react.createElement)(SettingsSection, {
-					t,
-					profile: config.profile,
-					onClose: () => {
-						section?.();
-						section = null;
-					}
-				})));
-				window.__voiceAnywhere = {
-					...window.__voiceAnywhere,
-					section: "registered"
-				};
-			}).catch((error) => report("config", error));
-			return () => {
-				cancelled = true;
-				section?.();
-			};
-		});
+		const t = ctx.locale.bind(NAMESPACE);
+		ctx.effect(() => ctx.locale.register(NAMESPACE, DICTS));
 		ctx.effect(() => {
 			const style = document.createElement("style");
 			style.setAttribute("data-voice-anywhere-style", "");
-			style.textContent = `${VOICE_ANYWHERE_CSS}
-/* While a plain field is being recorded, the row replaces its text. */
-[data-voice-anywhere-capturing] { color: transparent !important; caret-color: transparent !important; }
-[data-voice-anywhere-capturing]::placeholder { color: transparent !important; }`;
+			style.textContent = `${VOICE_ANYWHERE_CSS}${EXTRA_CSS}`;
 			document.head.appendChild(style);
 			return () => {
 				style.remove();
@@ -3378,36 +3458,19 @@ function apply(ctx) {
 				navigation.set(false);
 			});
 		});
-		const face = {
-			hooks: {
-				speechReadiness: speech.store,
-				microphoneDevice: recorder.devices,
-				pluginNavigation: navigation
-			},
-			createRecording: () => recorder.createRecording(),
-			transcribe: (request, signal) => speech.transcribe(request, signal),
-			openSettings: () => {
-				try {
-					ctx.get("pluginNavigation")?.openBundle(VOICE_BUNDLE);
-				} catch (error) {
-					report("open-settings", error);
-				}
-			},
-			prepare: (providerId, options) => speech.prepare(providerId, options),
-			cancelPreparation: (providerId) => speech.cancelPreparation(providerId),
-			configure: (patch) => speech.configure(patch),
-			selectMicrophone: (device) => {
-				recorder.devices.set(device);
-			},
-			refreshReadiness: () => speech.refresh()
-		};
+		const face = createFace({
+			ctx,
+			speech,
+			recorder,
+			navigation
+		});
 		ctx.slots.inject("shell.overlay", () => ctx.slots.register({
 			name: "shell.overlay",
 			id: "voice-anywhere.button",
-			locale: NS,
+			locale: NAMESPACE,
 			inject: () => face
 		}, FloatingMic));
-		ctx.effect(() => registerShortcut(ctx, t, report));
+		ctx.effect(() => registerShortcut(ctx, t, fail));
 		ctx.effect(() => {
 			speech.observe();
 			return () => speech.dispose();
@@ -3429,8 +3492,34 @@ function apply(ctx) {
 				window.removeEventListener("storage", refreshTriggers);
 			};
 		});
+		ctx.effect(() => {
+			let section = null;
+			let cancelled = false;
+			loadConfig().then((config) => {
+				if (cancelled || !config.settingsPage || isPageClosed(config.revision, config.profile)) return;
+				section = ctx.slots.inject("settings.section", () => ctx.slots.register({
+					name: "settings.section",
+					id: "voice-anywhere",
+					order: 70,
+					locale: NAMESPACE,
+					label: () => t("settings.label")
+				}, () => (0, react.createElement)(SettingsSection, {
+					t,
+					profile: config.profile,
+					onClose: () => {
+						section?.();
+						section = null;
+					}
+				})));
+				note({ section: "registered" });
+			}).catch((error) => fail("config", error));
+			return () => {
+				cancelled = true;
+				section?.();
+			};
+		});
 	} catch (error) {
-		report("activate", error);
+		fail("activate", error);
 	}
 }
 //#endregion

@@ -6,7 +6,8 @@ import assert from 'node:assert/strict'
 
 globalThis.window = { addEventListener: () => {}, removeEventListener: () => {} }
 
-const { expressionOf, matchesKey, matchesMouse, parseTriggers, startTriggers } = await import('../src/triggers.ts')
+const { expressionOf, matchesKey, matchesMouse, parseTriggers } = await import('../src/trigger/expression.ts')
+const { startTriggers } = await import('../src/trigger/engine.ts')
 
 let passed = 0
 function ok(name) {

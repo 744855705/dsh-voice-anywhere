@@ -107,29 +107,32 @@
 ## 开发
 
 ```bash
-node build.mjs            # 产出 client.js（内联官方组件与样式）
-node tests/classify.test.mjs
-node tests/placement.test.mjs
-node tests/insert.test.mjs
-node tests/host-config.test.mjs
-node tests/host-apply.test.mjs
-node tests/policy.test.mjs
-node tests/config.test.mjs
-node tests/surfaces.test.mjs
-node tests/triggers.test.mjs
-node tests/storage.test.mjs
-node tests/wiring.test.mjs
+npm install          # 只装 devDependencies（typescript）
+npm run build        # 产出 client.js（内联官方组件与样式，并写入源码哈希）
+npm run typecheck    # tsc --noEmit，0 错误
+npm test             # 逐个跑 tests/*.test.mjs
+npm run check-build  # 校验 client.js 与源码一致（防止改了没重建）
+npm run verify       # 以上三项串起来，CI 跑的就是它
 ```
 
-目录职责：
+### 结构
 
 | 路径 | 职责 |
 |---|---|
-| `index.js`、`host/config.mjs` | 宿主半边：profile 工作目录、配置路由 |
+| `index.js`、`host/config.mjs` | 宿主半边：profile 工作目录、配置路由、revision |
+| `src/client.ts` | 装配：locale、样式、槽位、快捷键、触发器、设置页 |
+| `src/face.ts` | 交给官方组件的注入面（录音、转写、导航） |
+| `src/locales.ts` | 命令名与设置页文案（扁平键） |
+| `src/diagnostics.ts` | `window.__voiceAnywhere` 的唯一写入点 |
 | `src/config.ts` | 配置类型、解析、拉取 |
-| `src/policy.ts` | 哪些表面可见 |
+| `src/storage.ts` | 本地存储（带版本，迁移旧的裸数组） |
+| `src/policy.ts` | 谁可见 |
 | `src/surfaces.ts` | 表面识别与聚焦解析 |
 | `src/placement.ts` | 几何：停靠与字段布局 |
-| `src/targets.ts` | 输入框识别与文本写入 |
-| `src/FloatingMic.ts` | 仅渲染官方组件 |
-| `src/client.ts` | 装配（locale、样式、槽位、快捷键） |
+| `src/activate.ts` | 唯一的“录音中=停 / 否则开录”决策 |
+| `src/floating/use-surface-control.ts` | 控件的状态与同步 |
+| `src/floating/view.ts` | 只负责渲染 portal |
+| `src/settings/section.ts`、`styles.ts` | 设置页的行为与排版 |
+| `src/trigger/expression.ts` | 触发器表达式的解析与匹配（纯函数） |
+| `src/trigger/engine.ts` | 捕获阶段的键盘/鼠标监听 |
+| `src/targets.ts`、`src/controls.ts`、`src/speech.ts`、`src/recording.ts` | 输入框识别与写入、控件状态契约、语音服务、录音 |

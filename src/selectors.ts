@@ -6,6 +6,8 @@
  * copy of any of these literals elsewhere is a bug waiting for a rename.
  */
 export const SELECTORS = {
+  /** The composer card; it owns its own microphone and is never ours. */
+  composer: '[data-composer-card]',
   questionCard: '[data-question-key]',
   dialog: '[role="dialog"][aria-modal="true"]',
   shortcuts: '[data-shortcut-modal="shortcuts"]',

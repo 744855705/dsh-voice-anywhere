@@ -6,6 +6,8 @@
  */
 
 const TRIGGERS_KEY = 'dsh.voice-anywhere.triggers'
+/** Shape version of the stored value; a legacy bare array is migrated on read. */
+const STORAGE_VERSION = 1
 const CLOSED_KEY = 'dsh.voice-anywhere.settings-closed'
 
 /**
@@ -25,14 +27,33 @@ function closedKey(profile: string): string {
  */
 export function loadTriggerText(fallback: readonly string[]): string[] {
   try {
-    const raw = localStorage.getItem(TRIGGERS_KEY)
-    if (raw === null) return [...fallback]
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return [...fallback]
-    return parsed.filter((entry): entry is string => typeof entry === 'string')
+    const parsed = parseStored(localStorage.getItem(TRIGGERS_KEY))
+    return parsed ?? [...fallback]
   } catch {
     return [...fallback]
   }
+}
+
+/** One stored value: the current envelope, or the pre-0.1.1 bare array. */
+interface StoredTriggers {
+  readonly v: number
+  readonly triggers: readonly string[]
+}
+
+/**
+ * Parse a stored value, accepting both shapes.
+ * @param raw - raw storage text, or null when nothing was stored.
+ * @returns the trigger list, or null when the value is absent or unusable.
+ */
+function parseStored(raw: string | null): string[] | null {
+  if (raw === null) return null
+  const parsed: unknown = JSON.parse(raw)
+  const list = Array.isArray(parsed)
+    ? parsed
+    : parsed !== null && typeof parsed === 'object' && Array.isArray((parsed as StoredTriggers).triggers)
+      ? (parsed as StoredTriggers).triggers
+      : null
+  return list === null ? null : list.filter((entry): entry is string => typeof entry === 'string')
 }
 
 /**
@@ -41,7 +62,7 @@ export function loadTriggerText(fallback: readonly string[]): string[] {
  */
 export function saveTriggerText(values: readonly string[]): void {
   try {
-    localStorage.setItem(TRIGGERS_KEY, JSON.stringify(values))
+    localStorage.setItem(TRIGGERS_KEY, JSON.stringify({ v: STORAGE_VERSION, triggers: [...values] } satisfies StoredTriggers))
   } catch {
     // Private mode or a quota refusal: the session still works, just unsaved.
   }
