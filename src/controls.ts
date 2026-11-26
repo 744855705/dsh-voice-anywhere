@@ -1,0 +1,89 @@
+/**
+ * One press contract for both microphone entries.
+ *
+ * The shortcut must behave exactly like pressing the button under the current
+ * target, so it never calls the recording pipeline itself: it resolves a
+ * container and dispatches the click the user would have made. Keeping the DOM
+ * selectors here means the composer's markup is known in one place only.
+ */
+
+/** Idle microphone, active capture, or a state that accepts no press. */
+export type ControlState = 'none' | 'idle' | 'recording' | 'busy'
+
+export interface VoiceControl {
+  /** @returns the container's phase, or `none` when it is not rendered. */
+  state(): ControlState
+  /** @returns whether a press right now would reach a button. */
+  canPress(): boolean
+  /** @returns whether a click was dispatched. */
+  press(): boolean
+}
+
+/** The official microphone occupies this slot inside the composer card. */
+const COMPOSER_CONTAINER = '[data-composer-card] [data-slot="conversation.input.activity"]'
+/** Our floating instance marks its portal root. */
+export const FLOATING_ROOT = '[data-voice-anywhere-root]'
+/** Both instances render the capture row with this phase attribute. */
+const ACTIVITY = '[data-voice-activity]'
+
+/**
+ * Read the phase of one microphone container.
+ * @param container - slot anchor or portal root.
+ * @returns the press-relevant state.
+ */
+function stateOf(container: HTMLElement | null): ControlState {
+  if (container === null) return 'none'
+  const row = container.querySelector(ACTIVITY)
+  if (row === null) return container.querySelector('button') === null ? 'none' : 'idle'
+  return row.getAttribute('data-voice-activity') === 'recording' ? 'recording' : 'busy'
+}
+
+/**
+ * Detect a capture already running somewhere other than `container`.
+ * @param container - the container a press would act on, or null when it does not exist yet.
+ * @returns whether another entry holds the microphone.
+ */
+export function hasForeignRecording(container: Element | null): boolean {
+  for (const row of document.querySelectorAll('[data-voice-activity="recording"]')) {
+    if (container === null || !container.contains(row)) return true
+  }
+  return false
+}
+
+/**
+ * Build a control over one container.
+ * @param find - locates the current container.
+ * @returns the press contract.
+ */
+function controlOver(find: () => HTMLElement | null): VoiceControl {
+  const state = (): ControlState => stateOf(find())
+  const canPress = (): boolean => {
+    const container = find()
+    const phase = stateOf(container)
+    if (container === null || phase === 'none' || phase === 'busy') return false
+    // A second capture must never start while another entry is recording.
+    return phase === 'recording' || !hasForeignRecording(container)
+  }
+  return {
+    state,
+    canPress,
+    press: () => {
+      if (!canPress()) return false
+      const container = find()
+      if (container === null) return false
+      const row = container.querySelector(ACTIVITY)
+      const buttons = (row ?? container).querySelectorAll('button')
+      if (buttons.length === 0) return false
+      // The official row leads with cancel and ends with stop; idle has one trigger.
+      const button = stateOf(container) === 'recording' ? buttons[buttons.length - 1] : buttons[0]
+      ;(button as HTMLButtonElement).click()
+      return true
+    },
+  }
+}
+
+/** The microphone inside the conversation composer. */
+export const composerControl: VoiceControl = controlOver(() => document.querySelector<HTMLElement>(COMPOSER_CONTAINER))
+
+/** The microphone this plugin floats next to the focused field. */
+export const floatingControl: VoiceControl = controlOver(() => document.querySelector<HTMLElement>(FLOATING_ROOT))

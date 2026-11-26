@@ -1,0 +1,36 @@
+{
+  "name": "dsh-voice-anywhere",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Voice input in any text field: the official microphone, reused as a floating control outside the conversation composer",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "README.md",
+    "index.js",
+    "host",
+    "client.js",
+    "build.mjs",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "docs",
+    "icon.svg",
+    "src"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "engines": {
+    "dsh": "^0.2.3-alpha.2"
+  }
+}

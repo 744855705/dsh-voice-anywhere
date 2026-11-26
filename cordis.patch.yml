@@ -1,0 +1,5 @@
+# One row: the browser half carries the microphone and the policy, the host half
+# publishes the profile's configuration file (see host/config.mjs).
+- insert:
+    - id: voice-anywhere
+      name: 'dsh-voice-anywhere'

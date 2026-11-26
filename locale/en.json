@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Voice input anywhere",
+    "description": "Shows the official microphone beside any text field outside the conversation composer and writes the transcript back into that field, using the same recognizer; one shortcut drives it and the official button.",
+    "detail": "docs/DETAIL.md"
+  }
+}
