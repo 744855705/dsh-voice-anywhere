@@ -6,6 +6,7 @@
  */
 
 const TRIGGERS_KEY = 'dsh.voice-anywhere.triggers'
+const SUBMIT_KEY = 'dsh.voice-anywhere.submit'
 /** Shape version of the stored value; a legacy bare array is migrated on read. */
 const STORAGE_VERSION = 1
 const CLOSED_KEY = 'dsh.voice-anywhere.settings-closed'
@@ -20,30 +21,17 @@ function closedKey(profile: string): string {
   return `${CLOSED_KEY}:${profile}`
 }
 
-/**
- * Read the saved triggers.
- * @param fallback - value from the configuration file.
- * @returns the saved list, or the fallback when nothing was saved.
- */
-export function loadTriggerText(fallback: readonly string[]): string[] {
-  try {
-    const parsed = parseStored(localStorage.getItem(TRIGGERS_KEY))
-    return parsed ?? [...fallback]
-  } catch {
-    return [...fallback]
-  }
-}
-
-/** One stored value: the current envelope, or the pre-0.1.1 bare array. */
+/** The stored envelope. */
 interface StoredTriggers {
   readonly v: number
   readonly triggers: readonly string[]
 }
 
 /**
- * Parse a stored value, accepting both shapes.
+ * Parse a stored value, accepting both the versioned envelope and the legacy
+ * bare array written before 0.1.2.
  * @param raw - raw storage text, or null when nothing was stored.
- * @returns the trigger list, or null when the value is absent or unusable.
+ * @returns the list, or null when the value is absent or unusable.
  */
 function parseStored(raw: string | null): string[] | null {
   if (raw === null) return null
@@ -56,17 +44,48 @@ function parseStored(raw: string | null): string[] | null {
   return list === null ? null : list.filter((entry): entry is string => typeof entry === 'string')
 }
 
+/** One versioned list kept in local storage. */
+interface ListStore {
+  load(fallback: readonly string[]): string[]
+  save(values: readonly string[]): void
+}
+
 /**
- * Persist the chosen triggers.
- * @param values - expressions to keep.
+ * Build the reader and writer for one list key.
+ * @param key - storage key.
+ * @returns the two accessors.
  */
-export function saveTriggerText(values: readonly string[]): void {
-  try {
-    localStorage.setItem(TRIGGERS_KEY, JSON.stringify({ v: STORAGE_VERSION, triggers: [...values] } satisfies StoredTriggers))
-  } catch {
-    // Private mode or a quota refusal: the session still works, just unsaved.
+function listStore(key: string): ListStore {
+  return {
+    load(fallback) {
+      try {
+        const parsed = parseStored(localStorage.getItem(key))
+        return parsed ?? [...fallback]
+      } catch {
+        return [...fallback]
+      }
+    },
+    save(values) {
+      try {
+        localStorage.setItem(key, JSON.stringify({ v: STORAGE_VERSION, triggers: [...values] } satisfies StoredTriggers))
+      } catch {
+        // Private mode or a quota refusal: the session still works, just unsaved.
+      }
+    },
   }
 }
+
+const triggers = listStore(TRIGGERS_KEY)
+const submits = listStore(SUBMIT_KEY)
+
+/** Read the dictation triggers. */
+export const loadTriggerText = triggers.load
+/** Persist the dictation triggers. */
+export const saveTriggerText = triggers.save
+/** Read the submit triggers. */
+export const loadSubmitText = submits.load
+/** Persist the submit triggers. */
+export const saveSubmitText = submits.save
 
 /**
  * Whether the page was closed from inside for this exact configuration version.

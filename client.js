@@ -12,9 +12,9 @@ let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-
 //#region \0voice-anywhere:build
 var _voice_anywhere_build_default = {
 	"official": "0.2.3-alpha.2",
-	"builtAt": "2026-11-26T19:33:28.388Z",
+	"builtAt": "2026-11-26T21:24:59.493Z",
 	"engines": "^0.2.3-alpha.2",
-	"srcHash": "c574027040cb5ffa"
+	"srcHash": "a7d1f5f4255da87d"
 };
 //#endregion
 //#region src/controls.ts
@@ -151,6 +151,7 @@ const DEFAULT_CONFIG = {
 	allow: [],
 	disable: [],
 	triggers: [],
+	submit: [],
 	settingsPage: true,
 	revision: "",
 	profile: ""
@@ -181,11 +182,20 @@ function normalizeConfig(raw) {
 	return {
 		allow: Array.isArray(raw.allow) ? raw.allow.filter((entry) => typeof entry === "string" && entry.trim() !== "") : [],
 		disable: Array.isArray(raw.disable) ? raw.disable.filter((entry) => typeof entry === "string" && TARGETS.has(entry)) : [],
-		triggers: Array.isArray(raw.triggers) ? raw.triggers.filter((entry) => typeof entry === "string" && entry.trim() !== "") : [],
+		triggers: stringList(raw.triggers),
+		submit: stringList(raw.submit),
 		settingsPage: raw.settingsPage !== false,
 		revision: typeof raw.revision === "string" ? raw.revision : "",
 		profile: typeof raw.profile === "string" ? raw.profile : ""
 	};
+}
+/**
+* Keep the string entries of one list field.
+* @param value - raw field value.
+* @returns the usable expressions.
+*/
+function stringList(value) {
+	return Array.isArray(value) ? value.filter((entry) => typeof entry === "string" && entry.trim() !== "") : [];
 }
 /**
 * Load the profile configuration once.
@@ -923,34 +933,34 @@ function failureText(failure, t) {
 //#endregion
 //#region \0voice-anywhere-css:/home/yanhongbin/deepseek-harness/packages/experimental/client-ui-voice-input/src/client/VoiceInput.module.css?va-module
 var VoiceInput_module_default = {
+	"inputLevel": "qU0WNq_inputLevel",
+	"preparationError": "qU0WNq_preparationError",
+	"preparationActions": "qU0WNq_preparationActions",
+	"downloadFailure": "qU0WNq_downloadFailure",
+	"inlineAction": "qU0WNq_inlineAction",
+	"triggerAnchor": "qU0WNq_triggerAnchor",
+	"summaryTitle": "qU0WNq_summaryTitle",
+	"stepProgress": "qU0WNq_stepProgress",
+	"sourceChoice": "qU0WNq_sourceChoice",
+	"captureRow": "qU0WNq_captureRow",
+	"waveform": "qU0WNq_waveform",
+	"activityMessage": "qU0WNq_activityMessage",
+	"progress": "qU0WNq_progress",
 	"stepBody": "qU0WNq_stepBody",
 	"preferences": "qU0WNq_preferences",
-	"sourceChoice": "qU0WNq_sourceChoice",
-	"downloadFailure": "qU0WNq_downloadFailure",
-	"deviceSelectMeter": "qU0WNq_deviceSelectMeter",
 	"settingsCard": "qU0WNq_settingsCard",
-	"triggerAnchor": "qU0WNq_triggerAnchor",
 	"roundButton": "qU0WNq_roundButton",
-	"summaryRow": "qU0WNq_summaryRow",
-	"activityMessage": "qU0WNq_activityMessage",
-	"preparation": "qU0WNq_preparation",
-	"preparationActions": "qU0WNq_preparationActions",
-	"waveform": "qU0WNq_waveform",
-	"progress": "qU0WNq_progress",
-	"stepProgress": "qU0WNq_stepProgress",
-	"deviceMeter": "qU0WNq_deviceMeter",
-	"inputLevel": "qU0WNq_inputLevel",
-	"deviceRow": "qU0WNq_deviceRow",
 	"setupEstimate": "qU0WNq_setupEstimate",
 	"deviceField": "qU0WNq_deviceField",
-	"inlineAction": "qU0WNq_inlineAction",
-	"deviceError": "qU0WNq_deviceError",
+	"deviceMeter": "qU0WNq_deviceMeter",
 	"metric": "qU0WNq_metric",
+	"summaryRow": "qU0WNq_summaryRow",
+	"steps": "qU0WNq_steps",
+	"deviceRow": "qU0WNq_deviceRow",
+	"preparation": "qU0WNq_preparation",
+	"deviceSelectMeter": "qU0WNq_deviceSelectMeter",
 	"trigger": "qU0WNq_trigger",
-	"preparationError": "qU0WNq_preparationError",
-	"summaryTitle": "qU0WNq_summaryTitle",
-	"captureRow": "qU0WNq_captureRow",
-	"steps": "qU0WNq_steps"
+	"deviceError": "qU0WNq_deviceError"
 };
 //#endregion
 //#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/Waveform.tsx
@@ -2614,7 +2624,11 @@ const COMMAND_LABEL = {
 const SETTINGS_TEXT = {
 	zh: {
 		"settings.label": "语音输入",
-		"settings.hint": "在这里添加触发键（键盘组合或鼠标键）。官方快捷键列表里的组合仍然有效，两者并存。",
+		"settings.hint": "为不使用键盘的场景录制触发键：键盘组合、鼠标键、遥控器发出的键都可以。",
+		"settings.voice": "语音输入",
+		"settings.voiceHint": "按下它开始录音，再按一次停止并转写。",
+		"settings.submit": "提交",
+		"settings.submitHint": "按下它等同按回车：把当前输入框的内容提交出去。",
 		"settings.empty": "还没有自定义触发键。",
 		"settings.capture": "录制按键",
 		"settings.capturing": "请按下按键或鼠标键…",
@@ -2625,7 +2639,11 @@ const SETTINGS_TEXT = {
 	},
 	en: {
 		"settings.label": "Voice input",
-		"settings.hint": "Add triggers (a key combination or a mouse button). Combinations in the official shortcut list keep working; both run side by side.",
+		"settings.hint": "Record triggers for keyboard-free use: a key combination, a mouse button, or a key sent by a remote.",
+		"settings.voice": "Voice input",
+		"settings.voiceHint": "Press it to start recording, press it again to stop and transcribe.",
+		"settings.submit": "Submit",
+		"settings.submitHint": "Press it to send what a plain Enter would send from the current field.",
 		"settings.empty": "No custom trigger yet.",
 		"settings.capture": "Record a trigger",
 		"settings.capturing": "Press a key or a mouse button…",
@@ -2754,6 +2772,7 @@ function createRecorder() {
 * triggers are per client, so a profile edit cannot silently overwrite them.
 */
 const TRIGGERS_KEY = "dsh.voice-anywhere.triggers";
+const SUBMIT_KEY = "dsh.voice-anywhere.submit";
 /** Shape version of the stored value; a legacy bare array is migrated on read. */
 const STORAGE_VERSION = 1;
 const CLOSED_KEY = "dsh.voice-anywhere.settings-closed";
@@ -2767,21 +2786,10 @@ function closedKey(profile) {
 	return `${CLOSED_KEY}:${profile}`;
 }
 /**
-* Read the saved triggers.
-* @param fallback - value from the configuration file.
-* @returns the saved list, or the fallback when nothing was saved.
-*/
-function loadTriggerText(fallback) {
-	try {
-		return parseStored(localStorage.getItem(TRIGGERS_KEY)) ?? [...fallback];
-	} catch {
-		return [...fallback];
-	}
-}
-/**
-* Parse a stored value, accepting both shapes.
+* Parse a stored value, accepting both the versioned envelope and the legacy
+* bare array written before 0.1.2.
 * @param raw - raw storage text, or null when nothing was stored.
-* @returns the trigger list, or null when the value is absent or unusable.
+* @returns the list, or null when the value is absent or unusable.
 */
 function parseStored(raw) {
 	if (raw === null) return null;
@@ -2790,17 +2798,39 @@ function parseStored(raw) {
 	return list === null ? null : list.filter((entry) => typeof entry === "string");
 }
 /**
-* Persist the chosen triggers.
-* @param values - expressions to keep.
+* Build the reader and writer for one list key.
+* @param key - storage key.
+* @returns the two accessors.
 */
-function saveTriggerText(values) {
-	try {
-		localStorage.setItem(TRIGGERS_KEY, JSON.stringify({
-			v: STORAGE_VERSION,
-			triggers: [...values]
-		}));
-	} catch {}
+function listStore(key) {
+	return {
+		load(fallback) {
+			try {
+				return parseStored(localStorage.getItem(key)) ?? [...fallback];
+			} catch {
+				return [...fallback];
+			}
+		},
+		save(values) {
+			try {
+				localStorage.setItem(key, JSON.stringify({
+					v: STORAGE_VERSION,
+					triggers: [...values]
+				}));
+			} catch {}
+		}
+	};
 }
+const triggers = listStore(TRIGGERS_KEY);
+const submits = listStore(SUBMIT_KEY);
+/** Read the dictation triggers. */
+const loadTriggerText = triggers.load;
+/** Persist the dictation triggers. */
+const saveTriggerText = triggers.save;
+/** Read the submit triggers. */
+const loadSubmitText = submits.load;
+/** Persist the submit triggers. */
+const saveSubmitText = submits.save;
 /**
 * Whether the page was closed from inside for this exact configuration version.
 * @param revision - host revision of the file.
@@ -2823,42 +2853,6 @@ function closePage(revision, profile) {
 		localStorage.setItem(closedKey(profile), revision);
 	} catch {}
 }
-//#endregion
-//#region src/settings/styles.ts
-/**
-* Inline spacing for the settings page.
-*
-* The component describes behaviour; the numbers live here so the layout can be
-* read (and changed) without scanning the render tree.
-*/
-const STYLE = {
-	page: {
-		display: "flex",
-		flexDirection: "column",
-		gap: "14px",
-		padding: "4px 0"
-	},
-	hint: {
-		margin: 0,
-		opacity: .72
-	},
-	list: {
-		display: "flex",
-		flexDirection: "column",
-		gap: "8px"
-	},
-	row: {
-		display: "flex",
-		alignItems: "center",
-		justifyContent: "space-between",
-		gap: "12px"
-	},
-	actions: {
-		display: "flex",
-		gap: "8px",
-		flexWrap: "wrap"
-	}
-};
 //#endregion
 //#region src/trigger/expression.ts
 const MODIFIER_NAMES = {
@@ -3049,27 +3043,81 @@ function expressionOf(event) {
 	return parseTrigger(expression) === null ? null : expression;
 }
 //#endregion
+//#region src/settings/styles.ts
+/**
+* Inline spacing for the settings page.
+*
+* The component describes behaviour; the numbers live here so the layout can be
+* read (and changed) without scanning the render tree.
+*/
+const STYLE = {
+	page: {
+		display: "flex",
+		flexDirection: "column",
+		gap: "14px",
+		padding: "4px 0"
+	},
+	hint: {
+		margin: 0,
+		opacity: .72
+	},
+	list: {
+		display: "flex",
+		flexDirection: "column",
+		gap: "8px"
+	},
+	row: {
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "space-between",
+		gap: "12px"
+	},
+	actions: {
+		display: "flex",
+		gap: "8px",
+		flexWrap: "wrap"
+	}
+};
+//#endregion
 //#region src/settings/section.ts
 /**
 * The plugin's own settings page.
 *
-* It exists only when the profile's configuration asks for it, and it only
-* edits triggers: the configuration file stays the single place that decides
-* what may be recorded into, which keeps this page from becoming a second,
-* silently divergent policy editor.
+* It exists to record triggers, nothing else: the configuration file stays the
+* single place that decides where dictation may happen, so this page can never
+* become a second, silently divergent policy editor.
 */
 /**
+* Render one editable trigger list.
+* @param props - translator, copy, values and the three callbacks.
+* @returns the column.
+*/
+function TriggerColumn(props) {
+	const { t, title, hint, values, capturing, onToggle, onRemove } = props;
+	return (0, react.createElement)("section", { style: STYLE.list }, (0, react.createElement)("div", { style: STYLE.row }, (0, react.createElement)("strong", null, title), (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+		variant: capturing ? "primary" : "outline",
+		onClick: onToggle
+	}, capturing ? t("settings.capturing") : t("settings.capture"))), (0, react.createElement)("p", { style: STYLE.hint }, hint), values.length === 0 ? (0, react.createElement)("p", { style: STYLE.hint }, t("settings.empty")) : (0, react.createElement)("div", { style: STYLE.list }, values.map((value) => (0, react.createElement)("div", {
+		key: value,
+		style: STYLE.row
+	}, (0, react.createElement)("code", null, value), (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+		variant: "outline",
+		onClick: () => onRemove(value)
+	}, t("settings.remove"))))));
+}
+/**
 * Render the trigger editor.
-* @param props - translator and the callback that removes the page again.
+* @param props - translator, profile name, and the callback that removes the page.
 * @returns the section body.
 */
 function SettingsSection(props) {
 	const { t, profile, onClose } = props;
-	const [values, setValues] = (0, react.useState)(() => loadTriggerText(currentConfig().triggers));
-	const [capturing, setCapturing$1] = (0, react.useState)(false);
+	const [voice, setVoice] = (0, react.useState)(() => loadTriggerText(currentConfig().triggers));
+	const [submit, setSubmit] = (0, react.useState)(() => loadSubmitText(currentConfig().submit));
+	const [capturing, setCapturing$1] = (0, react.useState)(null);
 	const [message, setMessage] = (0, react.useState)("");
 	(0, react.useEffect)(() => {
-		if (!capturing) return void 0;
+		if (capturing === null) return void 0;
 		setCapturing(true);
 		const capture = (event) => {
 			const expression = expressionOf(event);
@@ -3080,11 +3128,17 @@ function SettingsSection(props) {
 			}
 			event.preventDefault();
 			event.stopPropagation();
-			const next = [...values.filter((value) => value !== expression), expression];
-			setValues(next);
-			saveTriggerText(next);
+			if (capturing === "voice") {
+				const next = [...voice.filter((entry) => entry !== expression), expression];
+				setVoice(next);
+				saveTriggerText(next);
+			} else {
+				const next = [...submit.filter((entry) => entry !== expression), expression];
+				setSubmit(next);
+				saveSubmitText(next);
+			}
 			setMessage(`${t("settings.captured")} ${expression}`);
-			setCapturing$1(false);
+			setCapturing$1(null);
 		};
 		window.addEventListener("keydown", capture, true);
 		window.addEventListener("mousedown", capture, true);
@@ -3095,32 +3149,47 @@ function SettingsSection(props) {
 		};
 	}, [
 		capturing,
-		values,
+		voice,
+		submit,
 		t
 	]);
-	const remove = (value) => {
-		const next = values.filter((entry) => entry !== value);
-		setValues(next);
-		saveTriggerText(next);
+	const remove = (column, value) => {
+		if (column === "voice") {
+			const next = voice.filter((entry) => entry !== value);
+			setVoice(next);
+			saveTriggerText(next);
+		} else {
+			const next = submit.filter((entry) => entry !== value);
+			setSubmit(next);
+			saveSubmitText(next);
+		}
+	};
+	const toggle = (column) => {
+		setMessage("");
+		setCapturing$1((current) => current === column ? null : column);
 	};
 	const close = () => {
 		const config = currentConfig();
 		closePage(config.revision, profile ?? config.profile);
 		onClose?.();
 	};
-	return (0, react.createElement)("div", { style: STYLE.page }, (0, react.createElement)("p", { style: STYLE.hint }, t("settings.hint")), values.length === 0 ? (0, react.createElement)("p", { style: STYLE.hint }, t("settings.empty")) : (0, react.createElement)("div", { style: STYLE.list }, values.map((value) => (0, react.createElement)("div", {
-		key: value,
-		style: STYLE.row
-	}, (0, react.createElement)("code", null, value), (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-		variant: "outline",
-		onClick: () => remove(value)
-	}, t("settings.remove"))))), (0, react.createElement)("div", { style: STYLE.actions }, (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-		variant: "primary",
-		onClick: () => {
-			setMessage("");
-			setCapturing$1(!capturing);
-		}
-	}, capturing ? t("settings.capturing") : t("settings.capture")), (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+	return (0, react.createElement)("div", { style: STYLE.page }, (0, react.createElement)("p", { style: STYLE.hint }, t("settings.hint")), (0, react.createElement)(TriggerColumn, {
+		t,
+		title: t("settings.voice"),
+		hint: t("settings.voiceHint"),
+		values: voice,
+		capturing: capturing === "voice",
+		onToggle: () => toggle("voice"),
+		onRemove: (value) => remove("voice", value)
+	}), (0, react.createElement)(TriggerColumn, {
+		t,
+		title: t("settings.submit"),
+		hint: t("settings.submitHint"),
+		values: submit,
+		capturing: capturing === "submit",
+		onToggle: () => toggle("submit"),
+		onRemove: (value) => remove("submit", value)
+	}), (0, react.createElement)("div", { style: STYLE.actions }, (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.Button, {
 		variant: "outline",
 		onClick: close
 	}, t("settings.close"))), message === "" ? null : (0, react.createElement)("p", { style: STYLE.hint }, message));
@@ -3357,34 +3426,41 @@ function registerShortcut(ctx, t, report) {
 * events, and hands a match to the shared activation.
 */
 /**
-* Listen for the configured triggers.
-* @param host - trigger source and the action to run.
+* Listen for every configured binding.
+*
+* One listener pair serves all bindings: two independent engines would race on
+* the same event and could fire twice.
+* @param bindings - groups in priority order; the first match wins.
 * @returns the removal function.
 */
-function startTriggers(host) {
+function startTriggers(bindings) {
+	/**
+	* Dispatch one event to the first matching binding.
+	* @param event - the captured event.
+	* @param matches - matcher for this event kind.
+	* @returns whether something matched.
+	*/
+	const dispatch = (event, matches) => {
+		for (const binding of bindings) for (const trigger of binding.triggers()) {
+			if (!matches(trigger)) continue;
+			event.preventDefault();
+			event.stopPropagation();
+			binding.fire();
+			return true;
+		}
+		return false;
+	};
 	const onKeyDown = (event) => {
 		if (event.repeat || event.isComposing) return;
 		if (event.getModifierState?.("AltGraph") === true) return;
-		for (const trigger of host.triggers()) {
-			if (!matchesKey(trigger, event)) continue;
-			event.preventDefault();
-			event.stopPropagation();
-			host.fire();
-			return;
-		}
+		dispatch(event, (trigger) => matchesKey(trigger, event));
 	};
 	const onMouseDown = (event) => {
-		for (const trigger of host.triggers()) {
-			if (!matchesMouse(trigger, event)) continue;
-			event.preventDefault();
-			event.stopPropagation();
-			host.fire();
-			return;
-		}
+		dispatch(event, (trigger) => matchesMouse(trigger, event));
 	};
 	const onAuxClick = (event) => {
-		for (const trigger of host.triggers()) {
-			if (!matchesMouse(trigger, event)) continue;
+		for (const binding of bindings) {
+			if (!binding.triggers().some((trigger) => matchesMouse(trigger, event))) continue;
 			event.preventDefault();
 			event.stopPropagation();
 			return;
@@ -3398,6 +3474,55 @@ function startTriggers(host) {
 		window.removeEventListener("mousedown", onMouseDown, true);
 		window.removeEventListener("auxclick", onAuxClick, true);
 	};
+}
+//#endregion
+//#region src/submit.ts
+/**
+* Submit, exactly as pressing Enter would.
+*
+* The trigger exists so a remote or a mouse can finish what dictation started;
+* it therefore reproduces the key rather than guessing which button the user
+* meant. A synthetic Enter reaches the same handlers a real one does, including
+* React's delegated listeners.
+*/
+/** The key sequence a submit reproduces. */
+const ENTER = {
+	key: "Enter",
+	code: "Enter",
+	bubbles: true,
+	cancelable: true,
+	composed: true
+};
+/**
+* Resolve the editable that should receive Enter.
+*
+* The focused field wins because that is where a real Enter would land; the
+* visible surface's field is the fallback for the case where focus wandered to
+* a button after dictation inserted its text.
+* @returns the editable, or null when there is nothing to submit into.
+*/
+function submitTarget() {
+	const focused = classify(document.activeElement);
+	if (focused !== null) return focused.element;
+	return findSurface()?.field ?? null;
+}
+/**
+* Send one Enter key sequence to an element.
+* @param element - the editable that receives it.
+*/
+function dispatchEnter(element) {
+	element.dispatchEvent(new KeyboardEvent("keydown", ENTER));
+	element.dispatchEvent(new KeyboardEvent("keyup", ENTER));
+}
+/**
+* Plan the submit action.
+* @returns the action to run, or null while a capture is in progress or when no
+* editable can take the key.
+*/
+function planSubmit() {
+	if (composerControl.state() === "recording" || floatingControl.state() === "recording") return null;
+	const target = submitTarget();
+	return target === null ? null : () => dispatchEnter(target);
 }
 //#endregion
 //#region src/client.ts
@@ -3475,18 +3600,25 @@ function apply(ctx) {
 			speech.observe();
 			return () => speech.dispose();
 		});
-		let parsed = parseTriggers(loadTriggerText(currentConfig().triggers));
+		let voiceTriggers = parseTriggers(loadTriggerText(currentConfig().triggers));
+		let submitTriggers = parseTriggers(loadSubmitText(currentConfig().submit));
 		const refreshTriggers = () => {
-			parsed = parseTriggers(loadTriggerText(currentConfig().triggers));
+			voiceTriggers = parseTriggers(loadTriggerText(currentConfig().triggers));
+			submitTriggers = parseTriggers(loadSubmitText(currentConfig().submit));
 		};
 		window.addEventListener("storage", refreshTriggers);
 		ctx.effect(() => {
-			const stop = startTriggers({
-				triggers: () => isCapturing() ? [] : parsed,
+			const stop = startTriggers([{
+				triggers: () => isCapturing() ? [] : voiceTriggers,
 				fire: () => {
 					planActivation()?.();
 				}
-			});
+			}, {
+				triggers: () => isCapturing() ? [] : submitTriggers,
+				fire: () => {
+					planSubmit()?.();
+				}
+			}]);
 			return () => {
 				stop();
 				window.removeEventListener("storage", refreshTriggers);

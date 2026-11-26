@@ -65,9 +65,14 @@
 ```json
 {
   "triggers": ["Ctrl+Shift+Space", "Mouse:Back", "MediaPlayPause"],
-  "settingsPage": true
+  "submit": ["Ctrl+Shift+Enter", "Mouse:Forward"]
 }
 ```
+
+- `triggers`：开始/停止录音；
+- `submit`：**等同按回车**——向当前输入框派发一次 `Enter`，把内容提交出去（提问卡片、重命名、对话框、对话输入框都适用）；录音进行中不动作。
+
+两者都是**任意可捕获的键**：键盘组合、鼠标侧键、媒体键，遥控器编程后发出的键也能用。页面里点「录制按键」直接捕获即可。
 
 - 写法：`修饰键+键`（`Ctrl` / `Alt` / `Shift` / `Meta`）、`Mouse:Back` / `Mouse:Forward`、`MediaPlayPause` 这类媒体键名；
 - 单独的字母、数字会被忽略（否则打字就会触发）；`F1–F24` 与媒体键可以不带修饰键；

@@ -67,7 +67,7 @@ ok('every capturable combination parses back into a working trigger')
 const altGraph = new Map()
 globalThis.window.addEventListener = (type, handler) => altGraph.set(type, handler)
 let altFired = 0
-const stopAlt = startTriggers({ triggers: () => parseTriggers(['Ctrl+Alt+KeyE']), fire: () => { altFired += 1 } })
+const stopAlt = startTriggers([{ triggers: () => parseTriggers(['Ctrl+Alt+KeyE']), fire: () => { altFired += 1 } }])
 altGraph.get('keydown')({
   code: 'KeyE', key: '€', ctrlKey: true, altKey: true, shiftKey: false, metaKey: false,
   repeat: false, isComposing: false, preventDefault: () => {}, stopPropagation: () => {},
@@ -82,7 +82,7 @@ const removed = []
 globalThis.window.addEventListener = (type, handler) => listeners.set(type, handler)
 globalThis.window.removeEventListener = type => removed.push(type)
 let fired = 0
-const dispose = startTriggers({ triggers: () => parseTriggers(['Ctrl+Shift+Space', 'Mouse:Back']), fire: () => { fired += 1 } })
+const dispose = startTriggers([{ triggers: () => parseTriggers(['Ctrl+Shift+Space', 'Mouse:Back']), fire: () => { fired += 1 } }])
 let prevented = false
 listeners.get('keydown')({ ...ctrlShiftSpace, repeat: false, isComposing: false, preventDefault: () => { prevented = true }, stopPropagation: () => {} })
 assert.equal(fired, 1)
@@ -94,5 +94,19 @@ assert.equal(fired, 2)
 dispose()
 assert.deepEqual(removed.sort(), ['auxclick', 'keydown', 'mousedown'])
 ok('the engine fires only on its own triggers and removes every listener')
+
+// Two bindings share one listener pair, and a match belongs to exactly one.
+const groups = new Map()
+globalThis.window.addEventListener = (type, handler) => groups.set(type, handler)
+const hits = []
+const stopGroups = startTriggers([
+  { triggers: () => parseTriggers(['Ctrl+Shift+Space']), fire: () => { hits.push('voice') } },
+  { triggers: () => parseTriggers(['Ctrl+Alt+S']), fire: () => { hits.push('submit') } },
+])
+groups.get('keydown')({ code: 'KeyS', key: 's', ctrlKey: true, altKey: true, shiftKey: false, metaKey: false, repeat: false, isComposing: false, preventDefault: () => {}, stopPropagation: () => {} })
+groups.get('keydown')({ ...ctrlShiftSpace, repeat: false, isComposing: false, preventDefault: () => {}, stopPropagation: () => {} })
+assert.deepEqual(hits, ['submit', 'voice'])
+stopGroups()
+ok('independent bindings fire their own actions, never each other\'s')
 
 console.log(`\n${passed} assertions passed`)

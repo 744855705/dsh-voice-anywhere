@@ -21,9 +21,10 @@ import { createRecorder } from './recording.ts'
 import { SettingsSection } from './settings/section.ts'
 import { createSpeech } from './speech.ts'
 import { registerShortcut } from './shortcut.ts'
-import { isPageClosed, loadTriggerText } from './storage.ts'
+import { isPageClosed, loadSubmitText, loadTriggerText } from './storage.ts'
 import { parseTriggers } from './trigger/expression.ts'
 import { startTriggers } from './trigger/engine.ts'
+import { planSubmit } from './submit.ts'
 
 /** Build-generated stylesheet of the reused official component. */
 declare const VOICE_ANYWHERE_CSS: string
@@ -100,14 +101,18 @@ export function apply(ctx: any): void {
 
     // Custom triggers run beside the official shortcut, never instead of it.
     // The list is parsed once per save instead of on every keystroke.
-    let parsed = parseTriggers(loadTriggerText(currentConfig().triggers))
-    const refreshTriggers = (): void => { parsed = parseTriggers(loadTriggerText(currentConfig().triggers)) }
+    let voiceTriggers = parseTriggers(loadTriggerText(currentConfig().triggers))
+    let submitTriggers = parseTriggers(loadSubmitText(currentConfig().submit))
+    const refreshTriggers = (): void => {
+      voiceTriggers = parseTriggers(loadTriggerText(currentConfig().triggers))
+      submitTriggers = parseTriggers(loadSubmitText(currentConfig().submit))
+    }
     window.addEventListener('storage', refreshTriggers)
     ctx.effect(() => {
-      const stop = startTriggers({
-        triggers: () => (isCapturing() ? [] : parsed),
-        fire: () => { planActivation()?.() },
-      })
+      const stop = startTriggers([
+        { triggers: () => (isCapturing() ? [] : voiceTriggers), fire: () => { planActivation()?.() } },
+        { triggers: () => (isCapturing() ? [] : submitTriggers), fire: () => { planSubmit()?.() } },
+      ])
       return () => { stop(); window.removeEventListener('storage', refreshTriggers) }
     })
 

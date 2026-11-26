@@ -25,7 +25,11 @@ const COMMAND_LABEL: Record<'zh' | 'en' | 'ja' | 'es' | 'fr' | 'de' | 'ru' | 'pt
 const SETTINGS_TEXT: Record<'zh' | 'en', Record<string, string>> = {
   zh: {
     'settings.label': '语音输入',
-    'settings.hint': '在这里添加触发键（键盘组合或鼠标键）。官方快捷键列表里的组合仍然有效，两者并存。',
+    'settings.hint': '为不使用键盘的场景录制触发键：键盘组合、鼠标键、遥控器发出的键都可以。',
+    'settings.voice': '语音输入',
+    'settings.voiceHint': '按下它开始录音，再按一次停止并转写。',
+    'settings.submit': '提交',
+    'settings.submitHint': '按下它等同按回车：把当前输入框的内容提交出去。',
     'settings.empty': '还没有自定义触发键。',
     'settings.capture': '录制按键',
     'settings.capturing': '请按下按键或鼠标键…',
@@ -36,7 +40,11 @@ const SETTINGS_TEXT: Record<'zh' | 'en', Record<string, string>> = {
   },
   en: {
     'settings.label': 'Voice input',
-    'settings.hint': 'Add triggers (a key combination or a mouse button). Combinations in the official shortcut list keep working; both run side by side.',
+    'settings.hint': 'Record triggers for keyboard-free use: a key combination, a mouse button, or a key sent by a remote.',
+    'settings.voice': 'Voice input',
+    'settings.voiceHint': 'Press it to start recording, press it again to stop and transcribe.',
+    'settings.submit': 'Submit',
+    'settings.submitHint': 'Press it to send what a plain Enter would send from the current field.',
     'settings.empty': 'No custom trigger yet.',
     'settings.capture': 'Record a trigger',
     'settings.capturing': 'Press a key or a mouse button…',

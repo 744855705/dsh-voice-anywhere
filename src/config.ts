@@ -17,8 +17,10 @@ export interface VoiceConfig {
   readonly allow: readonly string[]
   /** Built-in surfaces switched off. */
   readonly disable: readonly PolicyTarget[]
-  /** Custom trigger expressions (`Ctrl+Shift+Space`, `Mouse:Back`, `MediaPlayPause`). */
+  /** Trigger expressions that start and stop dictation. */
   readonly triggers: readonly string[]
+  /** Trigger expressions that submit, exactly as Enter would. */
+  readonly submit: readonly string[]
   /** Whether this profile shows the plugin's own settings page; visible unless switched off. */
   readonly settingsPage: boolean
   /** Host-side revision of the file (content hash), used to tell "the user edited it" from "unchanged". */
@@ -28,7 +30,7 @@ export interface VoiceConfig {
 }
 
 /** Configuration used when the file is missing, unreadable, or invalid. */
-export const DEFAULT_CONFIG: VoiceConfig = { allow: [], disable: [], triggers: [], settingsPage: true, revision: '', profile: '' }
+export const DEFAULT_CONFIG: VoiceConfig = { allow: [], disable: [], triggers: [], submit: [], settingsPage: true, revision: '', profile: '' }
 
 /** Where the host half publishes the profile's configuration. */
 const CONFIG_URL = '/voice-anywhere/config.json'
@@ -60,14 +62,24 @@ export function normalizeConfig(raw: unknown): VoiceConfig {
   const disable = Array.isArray((raw as { disable?: unknown }).disable)
     ? ((raw as { disable: unknown[] }).disable.filter((entry): entry is PolicyTarget => typeof entry === 'string' && TARGETS.has(entry)))
     : []
-  const triggers = Array.isArray((raw as { triggers?: unknown }).triggers)
-    ? ((raw as { triggers: unknown[] }).triggers.filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== ''))
-    : []
+  const triggers = stringList((raw as { triggers?: unknown }).triggers)
+  const submit = stringList((raw as { submit?: unknown }).submit)
   // Visible by default: only an explicit `false` hides it from the settings list.
   const settingsPage = (raw as { settingsPage?: unknown }).settingsPage !== false
   const revision = typeof (raw as { revision?: unknown }).revision === 'string' ? (raw as { revision: string }).revision : ''
   const profile = typeof (raw as { profile?: unknown }).profile === 'string' ? (raw as { profile: string }).profile : ''
-  return { allow, disable, triggers, settingsPage, revision, profile }
+  return { allow, disable, triggers, submit, settingsPage, revision, profile }
+}
+
+/**
+ * Keep the string entries of one list field.
+ * @param value - raw field value.
+ * @returns the usable expressions.
+ */
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
+    : []
 }
 
 /**

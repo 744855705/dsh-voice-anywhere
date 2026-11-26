@@ -27,7 +27,7 @@ assert.deepEqual(
     settingsPage: true,
     revision: 'abc123', profile: 'web',
   }),
-  { allow: ['#a', 'input[aria-label="x"]'], disable: ['dialog'], triggers: ['Ctrl+Shift+Space'], settingsPage: true, revision: 'abc123', profile: 'web' },
+  { allow: ['#a', 'input[aria-label="x"]'], disable: ['dialog'], triggers: ['Ctrl+Shift+Space'], submit: [], settingsPage: true, revision: 'abc123', profile: 'web' },
 )
 ok('only string selectors and known targets survive')
 
@@ -40,7 +40,7 @@ ok('a failed fetch rejects and leaves the deny-by-default configuration')
 setConfig(DEFAULT_CONFIG)
 const okFetch = async () => ({ ok: true, json: async () => ({ allow: ['#field'], disable: ['shortcuts'], triggers: ['Mouse:Back'], settingsPage: true, revision: 'r7', profile: 'web' }) })
 const loaded = await loadConfig(okFetch)
-assert.deepEqual(loaded, { allow: ['#field'], disable: ['shortcuts'], triggers: ['Mouse:Back'], settingsPage: true, revision: 'r7', profile: 'web' })
+assert.deepEqual(loaded, { allow: ['#field'], disable: ['shortcuts'], triggers: ['Mouse:Back'], submit: [], settingsPage: true, revision: 'r7', profile: 'web' })
 assert.deepEqual(currentConfig(), loaded)
 ok('a successful fetch replaces the configuration')
 
