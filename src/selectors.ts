@@ -8,6 +8,8 @@
 export const SELECTORS = {
   /** The composer card; it owns its own microphone and is never ours. */
   composer: '[data-composer-card]',
+  /** The composer's editable root; the composer's own Enter handler lives on it. */
+  composerInput: '[data-composer-card] [data-composer-input]',
   questionCard: '[data-question-key]',
   dialog: '[role="dialog"][aria-modal="true"]',
   shortcuts: '[data-shortcut-modal="shortcuts"]',

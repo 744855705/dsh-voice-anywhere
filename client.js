@@ -12,9 +12,9 @@ let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-
 //#region \0voice-anywhere:build
 var _voice_anywhere_build_default = {
 	"official": "0.2.3-alpha.2",
-	"builtAt": "2026-11-26T21:24:59.493Z",
+	"builtAt": "2026-11-26T21:36:13.135Z",
 	"engines": "^0.2.3-alpha.2",
-	"srcHash": "a7d1f5f4255da87d"
+	"srcHash": "f7795175299b985c"
 };
 //#endregion
 //#region src/controls.ts
@@ -137,6 +137,8 @@ function note(patch) {
 const SELECTORS = {
 	/** The composer card; it owns its own microphone and is never ours. */
 	composer: "[data-composer-card]",
+	/** The composer's editable root; the composer's own Enter handler lives on it. */
+	composerInput: "[data-composer-card] [data-composer-input]",
 	questionCard: "[data-question-key]",
 	dialog: "[role=\"dialog\"][aria-modal=\"true\"]",
 	shortcuts: "[data-shortcut-modal=\"shortcuts\"]",
@@ -933,34 +935,34 @@ function failureText(failure, t) {
 //#endregion
 //#region \0voice-anywhere-css:/home/yanhongbin/deepseek-harness/packages/experimental/client-ui-voice-input/src/client/VoiceInput.module.css?va-module
 var VoiceInput_module_default = {
-	"inputLevel": "qU0WNq_inputLevel",
-	"preparationError": "qU0WNq_preparationError",
 	"preparationActions": "qU0WNq_preparationActions",
-	"downloadFailure": "qU0WNq_downloadFailure",
-	"inlineAction": "qU0WNq_inlineAction",
-	"triggerAnchor": "qU0WNq_triggerAnchor",
-	"summaryTitle": "qU0WNq_summaryTitle",
-	"stepProgress": "qU0WNq_stepProgress",
-	"sourceChoice": "qU0WNq_sourceChoice",
-	"captureRow": "qU0WNq_captureRow",
-	"waveform": "qU0WNq_waveform",
-	"activityMessage": "qU0WNq_activityMessage",
-	"progress": "qU0WNq_progress",
-	"stepBody": "qU0WNq_stepBody",
-	"preferences": "qU0WNq_preferences",
-	"settingsCard": "qU0WNq_settingsCard",
-	"roundButton": "qU0WNq_roundButton",
 	"setupEstimate": "qU0WNq_setupEstimate",
-	"deviceField": "qU0WNq_deviceField",
-	"deviceMeter": "qU0WNq_deviceMeter",
+	"roundButton": "qU0WNq_roundButton",
+	"inlineAction": "qU0WNq_inlineAction",
 	"metric": "qU0WNq_metric",
+	"summaryTitle": "qU0WNq_summaryTitle",
+	"deviceSelectMeter": "qU0WNq_deviceSelectMeter",
+	"deviceError": "qU0WNq_deviceError",
+	"deviceMeter": "qU0WNq_deviceMeter",
 	"summaryRow": "qU0WNq_summaryRow",
 	"steps": "qU0WNq_steps",
-	"deviceRow": "qU0WNq_deviceRow",
+	"waveform": "qU0WNq_waveform",
 	"preparation": "qU0WNq_preparation",
-	"deviceSelectMeter": "qU0WNq_deviceSelectMeter",
+	"preferences": "qU0WNq_preferences",
+	"triggerAnchor": "qU0WNq_triggerAnchor",
+	"captureRow": "qU0WNq_captureRow",
+	"activityMessage": "qU0WNq_activityMessage",
+	"preparationError": "qU0WNq_preparationError",
+	"downloadFailure": "qU0WNq_downloadFailure",
 	"trigger": "qU0WNq_trigger",
-	"deviceError": "qU0WNq_deviceError"
+	"stepBody": "qU0WNq_stepBody",
+	"deviceRow": "qU0WNq_deviceRow",
+	"sourceChoice": "qU0WNq_sourceChoice",
+	"progress": "qU0WNq_progress",
+	"settingsCard": "qU0WNq_settingsCard",
+	"deviceField": "qU0WNq_deviceField",
+	"stepProgress": "qU0WNq_stepProgress",
+	"inputLevel": "qU0WNq_inputLevel"
 };
 //#endregion
 //#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/Waveform.tsx
@@ -3504,15 +3506,43 @@ const ENTER = {
 function submitTarget() {
 	const focused = classify(document.activeElement);
 	if (focused !== null) return focused.element;
-	return findSurface()?.field ?? null;
+	const active = document.activeElement;
+	if (active instanceof Element && active.closest(SELECTORS.composer) !== null) {
+		const input = composerEditable(active.closest(SELECTORS.composer));
+		if (input !== null) return input;
+	}
+	const surface = findSurface();
+	if (surface !== null) return surface.field;
+	if (document.querySelector(SELECTORS.settings) !== null || document.querySelector(SELECTORS.platform) !== null) return null;
+	return composerEditable(document.querySelector(SELECTORS.composer));
+}
+/**
+* Find the node the composer's key handler listens on.
+*
+* Lexical attaches its root listener to the contenteditable it creates, which
+* can sit inside the marked wrapper; dispatching on the wrapper would never
+* reach it, because the event only bubbles upwards.
+* @param card - the composer card, or null when it is not rendered.
+* @returns the editable root, or null.
+*/
+function composerEditable(card) {
+	if (card === null) return null;
+	const editable = card.querySelector("[contenteditable=\"true\"], [contenteditable=\"\"]");
+	if (editable instanceof HTMLElement) return editable;
+	const marked = card.querySelector(SELECTORS.composerInput);
+	return marked instanceof HTMLElement ? marked : null;
 }
 /**
 * Send one Enter key sequence to an element.
 * @param element - the editable that receives it.
 */
 function dispatchEnter(element) {
-	element.dispatchEvent(new KeyboardEvent("keydown", ENTER));
-	element.dispatchEvent(new KeyboardEvent("keyup", ENTER));
+	for (const type of ["keydown", "keyup"]) {
+		const event = new KeyboardEvent(type, ENTER);
+		Object.defineProperty(event, "keyCode", { get: () => 13 });
+		Object.defineProperty(event, "which", { get: () => 13 });
+		element.dispatchEvent(event);
+	}
 }
 /**
 * Plan the submit action.
@@ -3522,6 +3552,10 @@ function dispatchEnter(element) {
 function planSubmit() {
 	if (composerControl.state() === "recording" || floatingControl.state() === "recording") return null;
 	const target = submitTarget();
+	note({ submit: {
+		target: target === null ? null : target.tagName + (target.closest(SELECTORS.composer) === null ? ":field" : ":composer"),
+		recording: composerControl.state() === "recording" || floatingControl.state() === "recording"
+	} });
 	return target === null ? null : () => dispatchEnter(target);
 }
 //#endregion

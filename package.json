@@ -1,6 +1,6 @@
 {
   "name": "dsh-voice-anywhere",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "description": "Voice input in any text field: the official microphone, reused as a floating control outside the conversation composer",

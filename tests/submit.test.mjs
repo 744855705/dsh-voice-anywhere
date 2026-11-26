@@ -64,4 +64,32 @@ dispatchEnter(target)
 assert.deepEqual(sent, [['keydown', 'Enter', true], ['keyup', 'Enter', true]])
 ok('the dispatched key is a bubbling Enter')
 
+// The composer's own Enter handler is the reason its editable is a target.
+class ComposerStub extends globalThis.HTMLElement {
+  constructor() { super(); this.kind = 'composer' }
+  querySelector(selector) {
+    return String(selector).includes('contenteditable') ? this : null
+  }
+  closest(selector) {
+    const value = String(selector)
+    if (value.includes('data-composer-input')) return this.kind === 'composer' ? this : null
+    if (value.includes('data-composer-card')) return this.kind === 'composer' || this.kind === 'card' ? this : null
+    return null
+  }
+}
+const composerInput = new ComposerStub()
+document.activeElement = composerInput
+document.querySelector = () => null
+assert.equal(submitTarget(), composerInput)
+ok('focus inside the composer targets the composer editable')
+
+document.activeElement = null
+document.querySelector = selector => (String(selector).includes('data-composer-card') ? composerInput : null)
+assert.equal(submitTarget(), composerInput)
+ok('the composer is the fallback when nothing else owns the screen')
+
+document.querySelector = selector => (String(selector).includes('data-shortcut-modal="settings"') ? {} : null)
+assert.equal(submitTarget(), null)
+ok('an open settings panel keeps submit away from the composer behind it')
+
 console.log(`\n${passed} assertions passed`)
