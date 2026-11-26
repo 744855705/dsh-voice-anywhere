@@ -12,9 +12,9 @@ let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-
 //#region \0voice-anywhere:build
 var _voice_anywhere_build_default = {
 	"official": "0.2.3-alpha.2",
-	"builtAt": "2026-11-26T21:36:13.135Z",
+	"builtAt": "2026-11-26T21:37:56.120Z",
 	"engines": "^0.2.3-alpha.2",
-	"srcHash": "f7795175299b985c"
+	"srcHash": "dd3e7bdc9dddcf54"
 };
 //#endregion
 //#region src/controls.ts
@@ -935,34 +935,34 @@ function failureText(failure, t) {
 //#endregion
 //#region \0voice-anywhere-css:/home/yanhongbin/deepseek-harness/packages/experimental/client-ui-voice-input/src/client/VoiceInput.module.css?va-module
 var VoiceInput_module_default = {
-	"preparationActions": "qU0WNq_preparationActions",
-	"setupEstimate": "qU0WNq_setupEstimate",
-	"roundButton": "qU0WNq_roundButton",
-	"inlineAction": "qU0WNq_inlineAction",
 	"metric": "qU0WNq_metric",
-	"summaryTitle": "qU0WNq_summaryTitle",
-	"deviceSelectMeter": "qU0WNq_deviceSelectMeter",
-	"deviceError": "qU0WNq_deviceError",
-	"deviceMeter": "qU0WNq_deviceMeter",
-	"summaryRow": "qU0WNq_summaryRow",
-	"steps": "qU0WNq_steps",
-	"waveform": "qU0WNq_waveform",
-	"preparation": "qU0WNq_preparation",
-	"preferences": "qU0WNq_preferences",
-	"triggerAnchor": "qU0WNq_triggerAnchor",
-	"captureRow": "qU0WNq_captureRow",
-	"activityMessage": "qU0WNq_activityMessage",
-	"preparationError": "qU0WNq_preparationError",
-	"downloadFailure": "qU0WNq_downloadFailure",
-	"trigger": "qU0WNq_trigger",
-	"stepBody": "qU0WNq_stepBody",
-	"deviceRow": "qU0WNq_deviceRow",
 	"sourceChoice": "qU0WNq_sourceChoice",
-	"progress": "qU0WNq_progress",
+	"preparation": "qU0WNq_preparation",
+	"trigger": "qU0WNq_trigger",
+	"downloadFailure": "qU0WNq_downloadFailure",
 	"settingsCard": "qU0WNq_settingsCard",
-	"deviceField": "qU0WNq_deviceField",
+	"summaryRow": "qU0WNq_summaryRow",
+	"deviceSelectMeter": "qU0WNq_deviceSelectMeter",
+	"deviceMeter": "qU0WNq_deviceMeter",
+	"summaryTitle": "qU0WNq_summaryTitle",
 	"stepProgress": "qU0WNq_stepProgress",
-	"inputLevel": "qU0WNq_inputLevel"
+	"captureRow": "qU0WNq_captureRow",
+	"preferences": "qU0WNq_preferences",
+	"setupEstimate": "qU0WNq_setupEstimate",
+	"progress": "qU0WNq_progress",
+	"inputLevel": "qU0WNq_inputLevel",
+	"preparationActions": "qU0WNq_preparationActions",
+	"activityMessage": "qU0WNq_activityMessage",
+	"stepBody": "qU0WNq_stepBody",
+	"inlineAction": "qU0WNq_inlineAction",
+	"deviceRow": "qU0WNq_deviceRow",
+	"steps": "qU0WNq_steps",
+	"roundButton": "qU0WNq_roundButton",
+	"deviceField": "qU0WNq_deviceField",
+	"triggerAnchor": "qU0WNq_triggerAnchor",
+	"waveform": "qU0WNq_waveform",
+	"preparationError": "qU0WNq_preparationError",
+	"deviceError": "qU0WNq_deviceError"
 };
 //#endregion
 //#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/Waveform.tsx
