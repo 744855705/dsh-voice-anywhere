@@ -8,6 +8,10 @@
  * then shows its own setup affordance instead of failing.
  */
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { note } from './diagnostics.ts'
+
+/** How often the catalog is re-read when the live stream is unavailable. */
+const POLL_MS = 20_000
 
 /** The namespace the official voice plugin mounts at startup. */
 export const SPEECH_SERVICE = 'remote.speech'
@@ -21,6 +25,20 @@ export interface SpeechReadiness {
 /** Minimal context face this module needs. */
 export interface SpeechContext {
   get(name: string): unknown
+}
+
+/**
+ * Pick the catalog out of either shape the namespace uses: a `RemoteResult`
+ * envelope from `catalog()`, or the catalog itself as `follow()` yields it.
+ * @param raw - method result or stream item.
+ * @returns the catalog, or null when the value is not one.
+ */
+function catalogOf(raw: unknown): unknown {
+  if (raw === null || typeof raw !== 'object') return null
+  if ('ok' in raw) return (raw as { ok: boolean; value?: unknown }).ok === true ? (raw as { value?: unknown }).value ?? null : null
+  const value = (raw as { value?: unknown }).value
+  if (value !== undefined) return value
+  return Array.isArray((raw as { providers?: unknown }).providers) ? raw : null
 }
 
 /**
@@ -59,6 +77,16 @@ export function createSpeech(ctx: SpeechContext) {
   }
 
   /**
+   * Publish one snapshot and leave the numbers where a field report can find
+   * them: "not ready" has three very different causes.
+   * @param next - the snapshot to publish.
+   */
+  const publish = (next: SpeechReadiness): void => {
+    store.set(next)
+    note({ readiness: { connected: next.connected, catalog: next.catalog !== null, error: next.error } })
+  }
+
+  /**
    * Read one catalog snapshot: the same provider selection and limits the
    * official button uses, which is why no preference logic lives here.
    * @returns after the snapshot settles.
@@ -66,18 +94,19 @@ export function createSpeech(ctx: SpeechContext) {
   const refresh = async (): Promise<void> => {
     const speech = service()
     if (speech === null) {
-      store.set({ catalog: null, connected: false, error: 'unavailable' })
+      publish({ catalog: null, connected: false, error: 'unavailable' })
       return
     }
     try {
       const result = await speech.catalog()
-      if (result !== null && typeof result === 'object' && result.ok === true) {
-        store.set({ catalog: result.value, connected: true, error: null })
+      const catalog = catalogOf(result)
+      if (catalog !== null) {
+        publish({ catalog, connected: true, error: null })
         return
       }
-      store.set({ ...store.getSnapshot(), connected: false, error: reasonOf(result) })
+      publish({ ...store.getSnapshot(), connected: false, error: reasonOf(result) })
     } catch (error) {
-      store.set({ ...store.getSnapshot(), connected: false, error: String(error) })
+      publish({ ...store.getSnapshot(), connected: false, error: String(error) })
     }
   }
 
@@ -85,21 +114,35 @@ export function createSpeech(ctx: SpeechContext) {
   const timers = new Set<number>()
 
   /**
+   * Re-read the catalog on a fixed cadence.
+   *
+   * Polling is the fallback for a namespace without `follow`, and the path taken
+   * after a stream ends. It owns connectivity: only a catalog answer can declare
+   * the feature unavailable.
+   * @param delay - milliseconds before the next read.
+   */
+  const poll = (delay = POLL_MS): void => {
+    if (disposed) return
+    const id = setTimeout(() => {
+      timers.delete(id)
+      void refresh().then(() => poll(delay))
+    }, delay)
+    timers.add(id)
+  }
+
+  /**
    * Keep readiness live instead of reading one snapshot.
    *
-   * The official namespace exposes `follow`; a quiet stream, a missing method,
-   * or a transport failure all fall back to a bounded retry, so a speech plugin
-   * that mounts after this one still turns the button on without a reload.
-   * @param attempt - retry depth, used only to space the backoff.
+   * The official namespace exposes `follow`; its items carry the same catalog.
+   * A stream that ends or fails says nothing about host readiness, so the last
+   * snapshot is kept and polling takes over — never a fabricated "not ready".
    */
-  const observe = async (attempt = 0): Promise<void> => {
+  const observe = async (): Promise<void> => {
+    await refresh()
     const speech = service()
+    if (disposed) return
     if (speech === null || typeof speech.follow !== 'function') {
-      await refresh()
-      if (!disposed) {
-        const id = setTimeout(() => { timers.delete(id); void observe(attempt) }, Math.min(30_000, 1_000 * 2 ** attempt))
-        timers.add(id)
-      }
+      poll()
       return
     }
     const controller = new AbortController()
@@ -109,24 +152,23 @@ export function createSpeech(ctx: SpeechContext) {
           controller.abort()
           return
         }
-        const value = (item as { value?: unknown }).value
-        if (value !== undefined) {
-          store.set({ catalog: value, connected: true, error: null })
+        const catalog = catalogOf(item)
+        if (catalog !== null) {
+          publish({ catalog, connected: true, error: null })
+          // A wrapped item (the official `$stream` carrier) needs its ack; a raw
+          // handle yields the catalog itself.
           ;(item as { accept?: () => void }).accept?.()
         }
       }
     } catch (error) {
-      store.set({ ...store.getSnapshot(), connected: false, error: String(error) })
+      // Keep the snapshot; record why the live path stopped.
+      note({ readinessStream: String(error) })
     }
-    if (!disposed) {
-      const id = setTimeout(() => { timers.delete(id); void observe(attempt + 1) }, Math.min(15_000, 500 * 2 ** attempt))
-      timers.add(id)
-    }
+    if (!disposed) poll()
   }
 
   /**
-   * Stop observing.
-   * @returns nothing.
+   * Stop observing and cancel every pending read.
    */
   const dispose = (): void => {
     disposed = true

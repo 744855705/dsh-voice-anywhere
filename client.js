@@ -12,9 +12,9 @@ let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-
 //#region \0voice-anywhere:build
 var _voice_anywhere_build_default = {
 	"official": "0.2.3-alpha.2",
-	"builtAt": "2026-11-26T21:37:56.120Z",
+	"builtAt": "2026-11-26T22:17:00.752Z",
 	"engines": "^0.2.3-alpha.2",
-	"srcHash": "dd3e7bdc9dddcf54"
+	"srcHash": "84f28de9baf424ee"
 };
 //#endregion
 //#region src/controls.ts
@@ -935,34 +935,34 @@ function failureText(failure, t) {
 //#endregion
 //#region \0voice-anywhere-css:/home/yanhongbin/deepseek-harness/packages/experimental/client-ui-voice-input/src/client/VoiceInput.module.css?va-module
 var VoiceInput_module_default = {
-	"metric": "qU0WNq_metric",
+	"roundButton": "qU0WNq_roundButton",
+	"deviceRow": "qU0WNq_deviceRow",
 	"sourceChoice": "qU0WNq_sourceChoice",
-	"preparation": "qU0WNq_preparation",
-	"trigger": "qU0WNq_trigger",
-	"downloadFailure": "qU0WNq_downloadFailure",
-	"settingsCard": "qU0WNq_settingsCard",
+	"inlineAction": "qU0WNq_inlineAction",
+	"deviceField": "qU0WNq_deviceField",
 	"summaryRow": "qU0WNq_summaryRow",
+	"downloadFailure": "qU0WNq_downloadFailure",
+	"waveform": "qU0WNq_waveform",
+	"setupEstimate": "qU0WNq_setupEstimate",
+	"steps": "qU0WNq_steps",
 	"deviceSelectMeter": "qU0WNq_deviceSelectMeter",
-	"deviceMeter": "qU0WNq_deviceMeter",
-	"summaryTitle": "qU0WNq_summaryTitle",
+	"triggerAnchor": "qU0WNq_triggerAnchor",
+	"metric": "qU0WNq_metric",
+	"preparationError": "qU0WNq_preparationError",
+	"preparation": "qU0WNq_preparation",
 	"stepProgress": "qU0WNq_stepProgress",
 	"captureRow": "qU0WNq_captureRow",
 	"preferences": "qU0WNq_preferences",
-	"setupEstimate": "qU0WNq_setupEstimate",
-	"progress": "qU0WNq_progress",
-	"inputLevel": "qU0WNq_inputLevel",
+	"summaryTitle": "qU0WNq_summaryTitle",
+	"settingsCard": "qU0WNq_settingsCard",
+	"deviceMeter": "qU0WNq_deviceMeter",
+	"deviceError": "qU0WNq_deviceError",
 	"preparationActions": "qU0WNq_preparationActions",
-	"activityMessage": "qU0WNq_activityMessage",
+	"trigger": "qU0WNq_trigger",
+	"inputLevel": "qU0WNq_inputLevel",
 	"stepBody": "qU0WNq_stepBody",
-	"inlineAction": "qU0WNq_inlineAction",
-	"deviceRow": "qU0WNq_deviceRow",
-	"steps": "qU0WNq_steps",
-	"roundButton": "qU0WNq_roundButton",
-	"deviceField": "qU0WNq_deviceField",
-	"triggerAnchor": "qU0WNq_triggerAnchor",
-	"waveform": "qU0WNq_waveform",
-	"preparationError": "qU0WNq_preparationError",
-	"deviceError": "qU0WNq_deviceError"
+	"progress": "qU0WNq_progress",
+	"activityMessage": "qU0WNq_activityMessage"
 };
 //#endregion
 //#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/Waveform.tsx
@@ -3207,8 +3207,23 @@ function SettingsSection(props) {
 * service leaves the readiness snapshot unavailable, and the reused component
 * then shows its own setup affordance instead of failing.
 */
+/** How often the catalog is re-read when the live stream is unavailable. */
+const POLL_MS = 2e4;
 /** The namespace the official voice plugin mounts at startup. */
 const SPEECH_SERVICE = "remote.speech";
+/**
+* Pick the catalog out of either shape the namespace uses: a `RemoteResult`
+* envelope from `catalog()`, or the catalog itself as `follow()` yields it.
+* @param raw - method result or stream item.
+* @returns the catalog, or null when the value is not one.
+*/
+function catalogOf(raw) {
+	if (raw === null || typeof raw !== "object") return null;
+	if ("ok" in raw) return raw.ok === true ? raw.value ?? null : null;
+	const value = raw.value;
+	if (value !== void 0) return value;
+	return Array.isArray(raw.providers) ? raw : null;
+}
 /**
 * Describe a failed Remote result without leaking its shape into callers.
 * @param result - Remote result or transport error.
@@ -3242,6 +3257,19 @@ function createSpeech(ctx) {
 		return speech;
 	};
 	/**
+	* Publish one snapshot and leave the numbers where a field report can find
+	* them: "not ready" has three very different causes.
+	* @param next - the snapshot to publish.
+	*/
+	const publish = (next) => {
+		store.set(next);
+		note({ readiness: {
+			connected: next.connected,
+			catalog: next.catalog !== null,
+			error: next.error
+		} });
+	};
+	/**
 	* Read one catalog snapshot: the same provider selection and limits the
 	* official button uses, which is why no preference logic lives here.
 	* @returns after the snapshot settles.
@@ -3249,7 +3277,7 @@ function createSpeech(ctx) {
 	const refresh = async () => {
 		const speech = service();
 		if (speech === null) {
-			store.set({
+			publish({
 				catalog: null,
 				connected: false,
 				error: "unavailable"
@@ -3258,21 +3286,22 @@ function createSpeech(ctx) {
 		}
 		try {
 			const result = await speech.catalog();
-			if (result !== null && typeof result === "object" && result.ok === true) {
-				store.set({
-					catalog: result.value,
+			const catalog = catalogOf(result);
+			if (catalog !== null) {
+				publish({
+					catalog,
 					connected: true,
 					error: null
 				});
 				return;
 			}
-			store.set({
+			publish({
 				...store.getSnapshot(),
 				connected: false,
 				error: reasonOf(result)
 			});
 		} catch (error) {
-			store.set({
+			publish({
 				...store.getSnapshot(),
 				connected: false,
 				error: String(error)
@@ -3282,24 +3311,34 @@ function createSpeech(ctx) {
 	let disposed = false;
 	const timers = /* @__PURE__ */ new Set();
 	/**
+	* Re-read the catalog on a fixed cadence.
+	*
+	* Polling is the fallback for a namespace without `follow`, and the path taken
+	* after a stream ends. It owns connectivity: only a catalog answer can declare
+	* the feature unavailable.
+	* @param delay - milliseconds before the next read.
+	*/
+	const poll = (delay = POLL_MS) => {
+		if (disposed) return;
+		const id = setTimeout(() => {
+			timers.delete(id);
+			refresh().then(() => poll(delay));
+		}, delay);
+		timers.add(id);
+	};
+	/**
 	* Keep readiness live instead of reading one snapshot.
 	*
-	* The official namespace exposes `follow`; a quiet stream, a missing method,
-	* or a transport failure all fall back to a bounded retry, so a speech plugin
-	* that mounts after this one still turns the button on without a reload.
-	* @param attempt - retry depth, used only to space the backoff.
+	* The official namespace exposes `follow`; its items carry the same catalog.
+	* A stream that ends or fails says nothing about host readiness, so the last
+	* snapshot is kept and polling takes over — never a fabricated "not ready".
 	*/
-	const observe = async (attempt = 0) => {
+	const observe = async () => {
+		await refresh();
 		const speech = service();
+		if (disposed) return;
 		if (speech === null || typeof speech.follow !== "function") {
-			await refresh();
-			if (!disposed) {
-				const id = setTimeout(() => {
-					timers.delete(id);
-					observe(attempt);
-				}, Math.min(3e4, 1e3 * 2 ** attempt));
-				timers.add(id);
-			}
+			poll();
 			return;
 		}
 		const controller = new AbortController();
@@ -3309,10 +3348,10 @@ function createSpeech(ctx) {
 					controller.abort();
 					return;
 				}
-				const value = item.value;
-				if (value !== void 0) {
-					store.set({
-						catalog: value,
+				const catalog = catalogOf(item);
+				if (catalog !== null) {
+					publish({
+						catalog,
 						connected: true,
 						error: null
 					});
@@ -3320,23 +3359,12 @@ function createSpeech(ctx) {
 				}
 			}
 		} catch (error) {
-			store.set({
-				...store.getSnapshot(),
-				connected: false,
-				error: String(error)
-			});
+			note({ readinessStream: String(error) });
 		}
-		if (!disposed) {
-			const id = setTimeout(() => {
-				timers.delete(id);
-				observe(attempt + 1);
-			}, Math.min(15e3, 500 * 2 ** attempt));
-			timers.add(id);
-		}
+		if (!disposed) poll();
 	};
 	/**
-	* Stop observing.
-	* @returns nothing.
+	* Stop observing and cancel every pending read.
 	*/
 	const dispose = () => {
 		disposed = true;
