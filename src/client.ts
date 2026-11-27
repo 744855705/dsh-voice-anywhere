@@ -15,6 +15,7 @@ import { isCapturing } from './capture-state.ts'
 import { currentConfig, loadConfig } from './config.ts'
 import { installDiagnostics, note, report } from './diagnostics.ts'
 import { evaluateOfficial } from './guard.ts'
+import { readBaseline, readBootSignals, writeBaseline } from './official-baseline.ts'
 import { setVerdict } from './stale.ts'
 import { createFace } from './face.ts'
 import { FloatingMic } from './floating/view.ts'
@@ -56,6 +57,22 @@ function fail(kind: string, error: unknown): void {
  */
 export function apply(ctx: any): void {
   installDiagnostics({ build })
+
+  // The boot graph carries a content hash of the official client entry, so the
+  // comparison needs no filesystem and behaves the same on every platform.
+  const signals = readBootSignals()
+  const official = evaluateOfficial({
+    rev: signals.rev,
+    releaseVersion: signals.releaseVersion,
+    builtVersion: build.official,
+    baseline: readBaseline(),
+  })
+  setVerdict(official)
+  if (official.adopt && signals.rev !== null) writeBaseline({ built: build.official, rev: signals.rev })
+  if (official.state === 'changed') {
+    console.warn(`[voice-anywhere] 官方语音组件已更新（基线 ${official.baselineRev?.slice(0, 8)} → 当前 ${official.rev?.slice(0, 8)}），建议更新插件。`)
+  }
+  note({ official })
 
   try {
     const t = ctx.locale.bind(NAMESPACE)
@@ -124,12 +141,7 @@ export function apply(ctx: any): void {
       let section: (() => void) | null = null
       let cancelled = false
       void loadConfig().then(config => {
-        const official = evaluateOfficial(config.official, build.officialHash)
-        setVerdict(official)
-        if (official.state === 'mismatch') {
-          console.warn(`[voice-anywhere] 官方语音组件已更新（构建 ${official.built.slice(0, 8)} · 当前 ${official.installed?.slice(0, 8)}），当前仍在使用旧副本，建议更新插件。`)
-        }
-        note({ official })
+
         // The file decides whether the page exists; closing it from inside only
         // silences this exact revision.
         if (cancelled || !config.settingsPage || isPageClosed(config.revision, config.profile)) return

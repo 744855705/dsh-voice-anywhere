@@ -7,7 +7,6 @@
  * page refresh without rebuilding or restarting.
  */
 import { createHash } from 'node:crypto'
-import { readOfficial } from './official.mjs'
 import { basename } from 'node:path'
 import { closeSync, mkdirSync, openSync, readFileSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
@@ -104,10 +103,5 @@ export function readConfigPayload(profileDir) {
   // page the user closed.
   const revision = createHash('sha256').update(body).digest('hex').slice(0, 16)
   const parsed = JSON.parse(body)
-  // `official` answers one question for the client: is the vendored copy still
-  // the installed code? It is computed per request so an upgrade needs no restart.
-  return {
-    payload: JSON.stringify({ ...parsed, revision, profile: basename(profileDir), official: readOfficial() }),
-    revision,
-  }
+  return { payload: JSON.stringify({ ...parsed, revision, profile: basename(profileDir) }), revision }
 }

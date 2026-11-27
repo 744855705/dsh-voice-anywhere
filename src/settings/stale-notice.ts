@@ -22,7 +22,10 @@ export function staleNotice(t: (key: string) => string): { tone: NoticeTone; tex
   }
   return {
     tone: 'danger',
-    text: format(t('settings.stale'), { built: verdict.built.slice(0, 8), installed: verdict.installed?.slice(0, 8) ?? '?' }),
+    text: format(t('settings.stale'), {
+      baseline: verdict.baselineRev?.slice(0, 8) ?? '?',
+      current: verdict.rev?.slice(0, 8) ?? '?',
+    }),
   }
 }
 

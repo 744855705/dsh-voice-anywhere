@@ -27,12 +27,6 @@ export interface VoiceConfig {
   readonly revision: string
   /** Profile this configuration belongs to, so browser storage never mixes profiles. */
   readonly profile: string
-  /** What the host read from the installed official package; absent on a failed request. */
-  readonly official?: {
-    readonly version: string | null
-    readonly hash: string | null
-    readonly reason: string | null
-  }
 }
 
 /** Configuration used when the file is missing, unreadable, or invalid. */
@@ -74,29 +68,7 @@ export function normalizeConfig(raw: unknown): VoiceConfig {
   const settingsPage = (raw as { settingsPage?: unknown }).settingsPage !== false
   const revision = typeof (raw as { revision?: unknown }).revision === 'string' ? (raw as { revision: string }).revision : ''
   const profile = typeof (raw as { profile?: unknown }).profile === 'string' ? (raw as { profile: string }).profile : ''
-  // The host's answer about the installed official package must survive
-  // normalization; dropping it here silently pinned the guard at "unknown".
-  const official = officialProbe((raw as { official?: unknown }).official)
-  // Only present when the host answered, so an absent probe leaves the shape
-  // callers already rely on unchanged.
-  return { allow, disable, triggers, submit, settingsPage, revision, profile, ...(official === undefined ? {} : { official }) }
-}
-
-/**
- * Read the host's probe of the official package.
- * @param value - raw field value.
- * @returns the probe, or undefined when the host did not provide a usable one.
- */
-function officialProbe(value: unknown): VoiceConfig['official'] {
-  if (value === null || typeof value !== 'object') return undefined
-  const hash = (value as { hash?: unknown }).hash
-  const version = (value as { version?: unknown }).version
-  const reason = (value as { reason?: unknown }).reason
-  return {
-    hash: typeof hash === 'string' ? hash : null,
-    version: typeof version === 'string' ? version : null,
-    reason: typeof reason === 'string' ? reason : null,
-  }
+  return { allow, disable, triggers, submit, settingsPage, revision, profile }
 }
 
 /**

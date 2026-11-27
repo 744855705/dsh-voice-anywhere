@@ -14,9 +14,9 @@ let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-
 var _voice_anywhere_build_default = {
 	"official": "0.2.3-alpha.2",
 	"officialHash": "3709d710fa82bc338d71d35774a45a86975a65b68408d512f4b0b1fd134136db",
-	"builtAt": "2026-11-27T02:00:36.116Z",
+	"builtAt": "2026-11-27T02:40:46.292Z",
 	"engines": "^0.2.3-alpha.2",
-	"srcHash": "cb4cea9537751828"
+	"srcHash": "f97ffdefeaf061b5"
 };
 //#endregion
 //#region src/controls.ts
@@ -227,39 +227,14 @@ function setConfig(next) {
 */
 function normalizeConfig(raw) {
 	if (typeof raw !== "object" || raw === null) return DEFAULT_CONFIG;
-	const allow = Array.isArray(raw.allow) ? raw.allow.filter((entry) => typeof entry === "string" && entry.trim() !== "") : [];
-	const disable = Array.isArray(raw.disable) ? raw.disable.filter((entry) => typeof entry === "string" && TARGETS.has(entry)) : [];
-	const triggers = stringList(raw.triggers);
-	const submit = stringList(raw.submit);
-	const settingsPage = raw.settingsPage !== false;
-	const revision = typeof raw.revision === "string" ? raw.revision : "";
-	const profile = typeof raw.profile === "string" ? raw.profile : "";
-	const official = officialProbe(raw.official);
 	return {
-		allow,
-		disable,
-		triggers,
-		submit,
-		settingsPage,
-		revision,
-		profile,
-		...official === void 0 ? {} : { official }
-	};
-}
-/**
-* Read the host's probe of the official package.
-* @param value - raw field value.
-* @returns the probe, or undefined when the host did not provide a usable one.
-*/
-function officialProbe(value) {
-	if (value === null || typeof value !== "object") return void 0;
-	const hash = value.hash;
-	const version = value.version;
-	const reason = value.reason;
-	return {
-		hash: typeof hash === "string" ? hash : null,
-		version: typeof version === "string" ? version : null,
-		reason: typeof reason === "string" ? reason : null
+		allow: Array.isArray(raw.allow) ? raw.allow.filter((entry) => typeof entry === "string" && entry.trim() !== "") : [],
+		disable: Array.isArray(raw.disable) ? raw.disable.filter((entry) => typeof entry === "string" && TARGETS.has(entry)) : [],
+		triggers: stringList(raw.triggers),
+		submit: stringList(raw.submit),
+		settingsPage: raw.settingsPage !== false,
+		revision: typeof raw.revision === "string" ? raw.revision : "",
+		profile: typeof raw.profile === "string" ? raw.profile : ""
 	};
 }
 /**
@@ -722,29 +697,97 @@ function setCapturing(value) {
 //#endregion
 //#region src/guard.ts
 /**
-* Compare this build's vendored hash with the installed package's.
-* @param probe - host answer; absent when the configuration request failed.
-* @param built - hash this build was compiled against.
+* Compare the running official client with this build.
+* @param signals - revision, release version, build version and the baseline.
 * @returns the verdict.
 */
-function evaluateOfficial(probe, built) {
-	if (probe === null || probe === void 0 || probe.hash === null) return {
+function evaluateOfficial(signals) {
+	const { rev, releaseVersion, builtVersion, baseline } = signals;
+	const base = {
+		rev,
+		baselineRev: baseline?.rev ?? null
+	};
+	if (rev === null) return {
+		...base,
 		state: "unknown",
-		built,
-		installed: null,
-		reason: probe?.reason ?? "configuration unavailable"
+		reason: "official entry missing",
+		adopt: false
 	};
-	return probe.hash === built ? {
+	if (baseline !== null && baseline.built === builtVersion) return baseline.rev === rev ? {
+		...base,
 		state: "match",
-		built,
-		installed: probe.hash,
-		reason: null
+		reason: null,
+		adopt: false
 	} : {
-		state: "mismatch",
-		built,
-		installed: probe.hash,
-		reason: null
+		...base,
+		state: "changed",
+		reason: null,
+		adopt: true
 	};
+	if (releaseVersion !== null && releaseVersion !== builtVersion) return {
+		...base,
+		state: "unknown",
+		reason: `host ${releaseVersion} != built ${builtVersion}`,
+		adopt: true
+	};
+	return {
+		...base,
+		state: "match",
+		reason: null,
+		adopt: true
+	};
+}
+//#endregion
+//#region src/official-baseline.ts
+/**
+* Where the official client's identity comes from, and where the baseline lives.
+*
+* The page already carries a content hash for every client entry: the boot
+* graph's `rev`. Comparing that with a recorded baseline detects a changed
+* official build on any platform, without reading package directories. The
+* baseline is per browser, so a fresh browser compares the release version and
+* adopts what it finds.
+*/
+/** Storage key for the recorded official revision. */
+const BASELINE_KEY = "dsh.voice-anywhere.official-rev";
+/**
+* Read the official entry's revision and the host release from the boot graph.
+* @returns both values, each null when the page does not expose it.
+*/
+function readBootSignals() {
+	const boot = window.__DSH_BOOT__;
+	const entry = (boot?.entries ?? []).find((item) => typeof item.id === "string" && item.id.includes("voice-input"));
+	return {
+		rev: typeof entry?.rev === "string" ? entry.rev : null,
+		releaseVersion: typeof boot?.release?.version === "string" ? boot.release.version : null
+	};
+}
+/**
+* Read the recorded baseline.
+* @returns the baseline, or null when this browser has none or it is unreadable.
+*/
+function readBaseline() {
+	try {
+		const parsed = JSON.parse(localStorage.getItem(BASELINE_KEY) ?? "null");
+		if (parsed === null || typeof parsed !== "object") return null;
+		const built = parsed.built;
+		const rev = parsed.rev;
+		return typeof built === "string" && typeof rev === "string" ? {
+			built,
+			rev
+		} : null;
+	} catch {
+		return null;
+	}
+}
+/**
+* Record a baseline, ignoring storage that refuses to keep it.
+* @param baseline - the pair to remember.
+*/
+function writeBaseline(baseline) {
+	try {
+		localStorage.setItem(BASELINE_KEY, JSON.stringify(baseline));
+	} catch {}
 }
 //#endregion
 //#region src/face.ts
@@ -1034,33 +1077,33 @@ function failureText(failure, t) {
 //#region \0voice-anywhere-css:/home/yanhongbin/global-dsh-project/dsh-voice-anywhere/src/vendor/voice-input/VoiceInput.module.css?va-module
 var VoiceInput_module_default = {
 	"deviceRow": "ZlutEW_deviceRow",
-	"sourceChoice": "ZlutEW_sourceChoice",
-	"inlineAction": "ZlutEW_inlineAction",
-	"triggerAnchor": "ZlutEW_triggerAnchor",
-	"activityMessage": "ZlutEW_activityMessage",
+	"preparationError": "ZlutEW_preparationError",
+	"captureRow": "ZlutEW_captureRow",
+	"stepBody": "ZlutEW_stepBody",
 	"progress": "ZlutEW_progress",
-	"steps": "ZlutEW_steps",
-	"deviceMeter": "ZlutEW_deviceMeter",
-	"inputLevel": "ZlutEW_inputLevel",
+	"preferences": "ZlutEW_preferences",
+	"metric": "ZlutEW_metric",
 	"deviceError": "ZlutEW_deviceError",
-	"roundButton": "ZlutEW_roundButton",
+	"inputLevel": "ZlutEW_inputLevel",
+	"deviceField": "ZlutEW_deviceField",
 	"preparationActions": "ZlutEW_preparationActions",
 	"deviceSelectMeter": "ZlutEW_deviceSelectMeter",
-	"preparationError": "ZlutEW_preparationError",
-	"settingsCard": "ZlutEW_settingsCard",
+	"deviceMeter": "ZlutEW_deviceMeter",
 	"waveform": "ZlutEW_waveform",
-	"downloadFailure": "ZlutEW_downloadFailure",
+	"activityMessage": "ZlutEW_activityMessage",
 	"stepProgress": "ZlutEW_stepProgress",
-	"setupEstimate": "ZlutEW_setupEstimate",
-	"captureRow": "ZlutEW_captureRow",
 	"preparation": "ZlutEW_preparation",
-	"deviceField": "ZlutEW_deviceField",
 	"trigger": "ZlutEW_trigger",
+	"steps": "ZlutEW_steps",
+	"sourceChoice": "ZlutEW_sourceChoice",
+	"triggerAnchor": "ZlutEW_triggerAnchor",
+	"inlineAction": "ZlutEW_inlineAction",
 	"summaryRow": "ZlutEW_summaryRow",
-	"summaryTitle": "ZlutEW_summaryTitle",
-	"metric": "ZlutEW_metric",
-	"stepBody": "ZlutEW_stepBody",
-	"preferences": "ZlutEW_preferences"
+	"settingsCard": "ZlutEW_settingsCard",
+	"downloadFailure": "ZlutEW_downloadFailure",
+	"setupEstimate": "ZlutEW_setupEstimate",
+	"roundButton": "ZlutEW_roundButton",
+	"summaryTitle": "ZlutEW_summaryTitle"
 };
 //#endregion
 //#region src/vendor/voice-input/Waveform.tsx
@@ -1793,7 +1836,13 @@ function FloatingMic(props) {
 			zIndex: 1050,
 			pointerEvents: "none"
 		}
-	}, [(0, react.createElement)(ErrorBoundary, {
+	}, (0, react.createElement)("div", { style: {
+		position: "relative",
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "center",
+		width: "100%"
+	} }, [(0, react.createElement)(ErrorBoundary, {
 		key: "control",
 		onError: (error) => {
 			markBlocked();
@@ -1822,7 +1871,7 @@ function FloatingMic(props) {
 		useMicrophoneDevice,
 		usePluginNavigation,
 		t
-	}))), badge]), document.body);
+	}))), badge])), document.body);
 }
 //#endregion
 //#region src/vendor/voice-input/locales.ts
@@ -2799,10 +2848,10 @@ const SETTINGS_TEXT = {
 		"settings.rejected": "这个组合无法用作触发键：",
 		"settings.remove": "删除",
 		"settings.close": "隐藏此设置页",
-		"settings.stale": "官方语音组件已更新：构建 {built}，当前 {installed}。当前仍在使用旧副本，建议更新插件。",
-		"settings.staleUnknown": "无法核对官方语音组件版本（{reason}），当前按原样运行。",
+		"settings.stale": "官方语音组件已更新（基线 {baseline} → 当前 {current}），当前仍在使用旧副本，建议更新插件。",
+		"settings.staleUnknown": "无法确认官方语音组件是否同步（{reason}），当前按原样运行。",
 		"settings.staleBroken": "官方组件与当前副本不兼容，浮动麦克风已停用，请更新插件。",
-		"badge.mismatch": "官方语音组件已更新，建议更新插件",
+		"badge.changed": "官方语音组件已更新，建议更新插件",
 		"badge.unknown": "无法核对官方语音组件版本",
 		"badge.broken": "官方组件与当前副本不兼容，浮动麦克风已停用"
 	},
@@ -2820,10 +2869,10 @@ const SETTINGS_TEXT = {
 		"settings.rejected": "That combination cannot be a trigger:",
 		"settings.remove": "Remove",
 		"settings.close": "Hide this page",
-		"settings.stale": "The official voice UI changed: built {built}, installed {installed}. This copy still runs; update the plugin when you can.",
-		"settings.staleUnknown": "Could not verify the official voice UI ({reason}); running this copy as-is.",
+		"settings.stale": "The official voice UI changed ({baseline} -> {current}). This copy still runs; update the plugin when you can.",
+		"settings.staleUnknown": "Could not confirm the official voice UI is in sync ({reason}); running this copy as-is.",
 		"settings.staleBroken": "The official UI and this copy disagree; the floating microphone is disabled. Please update the plugin.",
-		"badge.mismatch": "The official voice UI changed; consider updating the plugin",
+		"badge.changed": "The official voice UI changed; consider updating the plugin",
 		"badge.unknown": "Could not verify the official voice UI",
 		"badge.broken": "Incompatible with the official UI; the floating microphone is disabled"
 	}
@@ -3268,8 +3317,8 @@ function staleNotice(t) {
 	return {
 		tone: "danger",
 		text: format(t("settings.stale"), {
-			built: verdict.built.slice(0, 8),
-			installed: verdict.installed?.slice(0, 8) ?? "?"
+			baseline: verdict.baselineRev?.slice(0, 8) ?? "?",
+			current: verdict.rev?.slice(0, 8) ?? "?"
 		})
 	};
 }
@@ -3853,6 +3902,20 @@ function fail(kind, error) {
 */
 function apply(ctx) {
 	installDiagnostics({ build: _voice_anywhere_build_default });
+	const signals = readBootSignals();
+	const official = evaluateOfficial({
+		rev: signals.rev,
+		releaseVersion: signals.releaseVersion,
+		builtVersion: _voice_anywhere_build_default.official,
+		baseline: readBaseline()
+	});
+	setVerdict(official);
+	if (official.adopt && signals.rev !== null) writeBaseline({
+		built: _voice_anywhere_build_default.official,
+		rev: signals.rev
+	});
+	if (official.state === "changed") console.warn(`[voice-anywhere] 官方语音组件已更新（基线 ${official.baselineRev?.slice(0, 8)} → 当前 ${official.rev?.slice(0, 8)}），建议更新插件。`);
+	note({ official });
 	try {
 		const t = ctx.locale.bind(NAMESPACE);
 		ctx.effect(() => ctx.locale.register(NAMESPACE, DICTS));
@@ -3920,10 +3983,6 @@ function apply(ctx) {
 			let section = null;
 			let cancelled = false;
 			loadConfig().then((config) => {
-				const official = evaluateOfficial(config.official, _voice_anywhere_build_default.officialHash);
-				setVerdict(official);
-				if (official.state === "mismatch") console.warn(`[voice-anywhere] 官方语音组件已更新（构建 ${official.built.slice(0, 8)} · 当前 ${official.installed?.slice(0, 8)}），当前仍在使用旧副本，建议更新插件。`);
-				note({ official });
 				if (cancelled || !config.settingsPage || isPageClosed(config.revision, config.profile)) return;
 				section = ctx.slots.inject("settings.section", () => ctx.slots.register({
 					name: "settings.section",

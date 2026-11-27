@@ -96,6 +96,10 @@ export function FloatingMic(props: any) {
       zIndex: 1050,
       pointerEvents: 'none',
     },
+  // The badge lives in its own positioned box: a flex sibling next to the row
+  // would take width from it and squeeze the control.
+  }, h('div', {
+    style: { position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' },
   }, [
     h(ErrorBoundary, {
       key: 'control',
@@ -132,5 +136,5 @@ export function FloatingMic(props: any) {
     t,
   }))),
     badge,
-  ]), document.body)
+  ])), document.body)
 }
