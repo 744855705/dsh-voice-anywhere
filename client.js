@@ -14,9 +14,9 @@ let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-
 var _voice_anywhere_build_default = {
 	"official": "0.2.3-alpha.2",
 	"officialHash": "3709d710fa82bc338d71d35774a45a86975a65b68408d512f4b0b1fd134136db",
-	"builtAt": "2026-11-27T09:20:47.498Z",
+	"builtAt": "2026-11-27T14:49:45.995Z",
 	"engines": ">=0.2.2-rc.1 <=0.5.0",
-	"srcHash": "0846624b01c22ac0"
+	"srcHash": "26ed19e4521458c1"
 };
 //#endregion
 //#region src/controls.ts
@@ -72,7 +72,8 @@ function controlOver(find) {
 			if (container === null) return false;
 			const buttons = (container.querySelector(ACTIVITY) ?? container).querySelectorAll("button");
 			if (buttons.length === 0) return false;
-			(stateOf(container) === "recording" ? buttons[buttons.length - 1] : buttons[0]).click();
+			const phase = stateOf(container);
+			(phase === "recording" || phase === "feedback" ? buttons[buttons.length - 1] : buttons[0]).click();
 			return true;
 		}
 	};
@@ -1098,34 +1099,34 @@ function failureText(failure, t) {
 //#endregion
 //#region \0voice-anywhere-css:/home/yanhongbin/global-dsh-project/dsh-voice-anywhere/src/vendor/voice-input/VoiceInput.module.css?va-module
 var VoiceInput_module_default = {
-	"metric": "ZlutEW_metric",
-	"preparation": "ZlutEW_preparation",
-	"summaryRow": "ZlutEW_summaryRow",
-	"deviceField": "ZlutEW_deviceField",
-	"deviceError": "ZlutEW_deviceError",
-	"inputLevel": "ZlutEW_inputLevel",
-	"trigger": "ZlutEW_trigger",
-	"captureRow": "ZlutEW_captureRow",
-	"stepProgress": "ZlutEW_stepProgress",
-	"deviceRow": "ZlutEW_deviceRow",
-	"setupEstimate": "ZlutEW_setupEstimate",
-	"sourceChoice": "ZlutEW_sourceChoice",
-	"deviceMeter": "ZlutEW_deviceMeter",
-	"stepBody": "ZlutEW_stepBody",
-	"preparationActions": "ZlutEW_preparationActions",
 	"triggerAnchor": "ZlutEW_triggerAnchor",
 	"inlineAction": "ZlutEW_inlineAction",
-	"roundButton": "ZlutEW_roundButton",
+	"trigger": "ZlutEW_trigger",
+	"deviceRow": "ZlutEW_deviceRow",
+	"activityMessage": "ZlutEW_activityMessage",
+	"setupEstimate": "ZlutEW_setupEstimate",
+	"captureRow": "ZlutEW_captureRow",
+	"metric": "ZlutEW_metric",
+	"deviceField": "ZlutEW_deviceField",
+	"inputLevel": "ZlutEW_inputLevel",
+	"preparationActions": "ZlutEW_preparationActions",
 	"waveform": "ZlutEW_waveform",
 	"summaryTitle": "ZlutEW_summaryTitle",
-	"activityMessage": "ZlutEW_activityMessage",
-	"preparationError": "ZlutEW_preparationError",
-	"downloadFailure": "ZlutEW_downloadFailure",
-	"progress": "ZlutEW_progress",
+	"deviceMeter": "ZlutEW_deviceMeter",
 	"steps": "ZlutEW_steps",
-	"preferences": "ZlutEW_preferences",
 	"settingsCard": "ZlutEW_settingsCard",
-	"deviceSelectMeter": "ZlutEW_deviceSelectMeter"
+	"roundButton": "ZlutEW_roundButton",
+	"downloadFailure": "ZlutEW_downloadFailure",
+	"sourceChoice": "ZlutEW_sourceChoice",
+	"preferences": "ZlutEW_preferences",
+	"preparationError": "ZlutEW_preparationError",
+	"summaryRow": "ZlutEW_summaryRow",
+	"progress": "ZlutEW_progress",
+	"stepBody": "ZlutEW_stepBody",
+	"stepProgress": "ZlutEW_stepProgress",
+	"deviceSelectMeter": "ZlutEW_deviceSelectMeter",
+	"deviceError": "ZlutEW_deviceError",
+	"preparation": "ZlutEW_preparation"
 };
 //#endregion
 //#region src/vendor/voice-input/Waveform.tsx
@@ -1496,6 +1497,42 @@ var ErrorBoundary = class extends react.Component {
 	}
 };
 //#endregion
+//#region src/insertion.ts
+/**
+* Where a transcript lands, and what to do when the original target is gone.
+*
+* The rule is append, never lose: the captured element first, then whatever can
+* take text right now, and only when nothing can does the caller report failure
+* so the official component keeps the transcript pending instead of dropping it.
+*/
+/**
+* Resolve a target that exists right now.
+* @returns the focused editable, else the visible surface's field, else null.
+*/
+function liveTarget() {
+	const focused = classify(document.activeElement);
+	if (focused !== null) return focused;
+	const surface = findSurface();
+	return surface === null ? null : {
+		element: surface.field,
+		kind: surface.fieldKind
+	};
+}
+/**
+* Append a transcript, falling back to a live target.
+* @param text - transcript.
+* @param span - element captured at recording start, or null when it had none.
+* @returns whether the text was written somewhere.
+*/
+function insertTranscript(text, span) {
+	if (span !== null && span.element.isConnected && insertText({
+		element: span.element,
+		kind: span.kind
+	}, text)) return true;
+	const target = liveTarget();
+	return target !== null && insertText(target, text);
+}
+//#endregion
 //#region src/placement.ts
 const BUTTON_SIZE = 30;
 const ACTION_GAP = 8;
@@ -1800,13 +1837,6 @@ function useSurfaceControl(refreshReadiness) {
 /** The component only uses the id to reset its capture state. */
 const FIXED_SESSION = "voice-anywhere";
 /**
-* Copy as the last resort so a transcript is never lost when its field closed.
-* @param text - transcript.
-*/
-function copyToClipboard(text) {
-	navigator.clipboard?.writeText(text).catch(() => void 0);
-}
-/**
 * Render the official microphone where the current editable needs it.
 * @param props - injected speech face, synthesized readiness hooks, translator.
 * @returns the portal, or null while no editable is available.
@@ -1820,14 +1850,7 @@ function FloatingMic(props) {
 			element: target.element,
 			kind: target.kind
 		} : null,
-		insertText: (text, span) => {
-			if (span !== null) return span.element.isConnected && insertText({
-				element: span.element,
-				kind: span.kind
-			}, text);
-			copyToClipboard(text);
-			return true;
-		}
+		insertText: (text, span) => insertTranscript(text, span)
 	};
 	const state = isBlocked() ? "broken" : verdictOf()?.state ?? "unknown";
 	const badge = state === "match" ? null : (0, react.createElement)("span", {

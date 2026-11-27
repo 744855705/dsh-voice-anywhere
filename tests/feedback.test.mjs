@@ -84,8 +84,8 @@ clicks = []
 const composerAction = planActivation()
 assert.notEqual(composerAction, null)
 composerAction()
-assert.deepEqual(clicks, ['feedback:cancel'])
-ok('a composer feedback row is dismissed by the shortcut')
+assert.deepEqual(clicks, ['feedback:last'])
+ok('a composer feedback row presses its trailing action')
 
 // 2. Floating feedback: same row, different instance.
 globalThis.document.querySelector = selector => (String(selector).includes('data-voice-anywhere-root') ? floating : null)
@@ -93,8 +93,8 @@ clicks = []
 const floatingAction = planActivation()
 assert.notEqual(floatingAction, null)
 floatingAction()
-assert.deepEqual(clicks, ['feedback:cancel'])
-ok('a floating feedback row is dismissed by the shortcut')
+assert.deepEqual(clicks, ['feedback:last'])
+ok('a floating feedback row presses its trailing action')
 
 // 3. A running capture outranks a finished one on the other instance.
 const recording = new ContainerStub('recording')

@@ -84,10 +84,13 @@ function controlOver(find: () => HTMLElement | null): VoiceControl {
       const row = container.querySelector(ACTIVITY)
       const buttons = (row ?? container).querySelectorAll('button')
       if (buttons.length === 0) return false
-      // The official row leads with cancel and ends with stop; idle has one trigger, and a
-      // finished capture is dismissed by that same leading cancel button.
+      // The row leads with a bare cancel ✕ and ends with whatever the row is for:
+      // stop while recording, insert a preserved transcript, or retry after an
+      // empty result. That trailing button is the action a shortcut drives; the
+      // ✕ stays a pointer-only affordance. Idle has a single trigger button.
       const phase = stateOf(container)
-      const button = phase === 'recording' ? buttons[buttons.length - 1] : buttons[0]
+      const actionable = phase === 'recording' || phase === 'feedback'
+      const button = actionable ? buttons[buttons.length - 1] : buttons[0]
       ;(button as HTMLButtonElement).click()
       return true
     },

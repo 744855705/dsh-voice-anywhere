@@ -10,24 +10,11 @@ import { VoiceInput } from '../vendor/index.ts'
 import { ErrorBoundary } from '../components/error-boundary.ts'
 import { report } from '../diagnostics.ts'
 import { isBlocked, markBlocked, verdictOf } from '../stale.ts'
-import { insertText } from '../targets.ts'
+import { insertTranscript, type InsertionSpan } from '../insertion.ts'
 import { useSurfaceControl } from './use-surface-control.ts'
 
 /** The component only uses the id to reset its capture state. */
 const FIXED_SESSION = 'voice-anywhere'
-
-interface InsertionSpan {
-  readonly element: HTMLElement
-  readonly kind: 'field' | 'editor'
-}
-
-/**
- * Copy as the last resort so a transcript is never lost when its field closed.
- * @param text - transcript.
- */
-function copyToClipboard(text: string): void {
-  void navigator.clipboard?.writeText(text).catch(() => undefined)
-}
 
 /**
  * Render the official microphone where the current editable needs it.
@@ -47,17 +34,9 @@ export function FloatingMic(props: any) {
     captureInsertion: (): InsertionSpan | null => target.element.isConnected
       ? { element: target.element, kind: target.kind }
       : null,
-    insertText: (text: string, span: InsertionSpan | null): boolean => {
-      // A live target takes the text; a vanished one reports failure so the
-      // official component offers its retry instead of claiming a success that
-      // only reached the clipboard. That explicit retry carries no span, which
-      // is the only branch allowed to fall back to the clipboard.
-      if (span !== null) {
-        return span.element.isConnected && insertText({ element: span.element, kind: span.kind }, text)
-      }
-      copyToClipboard(text)
-      return true
-    },
+    // Append somewhere rather than claim success: reporting false keeps the
+    // transcript pending in the official row, where "insert" can retry it.
+    insertText: (text: string, span: InsertionSpan | null): boolean => insertTranscript(text, span),
   }
 
   // A copy that no longer matches is still usable until it proves otherwise, so
