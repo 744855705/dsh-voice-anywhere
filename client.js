@@ -14,9 +14,9 @@ let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-
 var _voice_anywhere_build_default = {
 	"official": "0.2.3-alpha.2",
 	"officialHash": "3709d710fa82bc338d71d35774a45a86975a65b68408d512f4b0b1fd134136db",
-	"builtAt": "2026-11-27T02:40:46.292Z",
+	"builtAt": "2026-11-27T05:34:37.089Z",
 	"engines": "^0.2.3-alpha.2",
-	"srcHash": "f97ffdefeaf061b5"
+	"srcHash": "e10c44a0cdc8f66f"
 };
 //#endregion
 //#region src/controls.ts
@@ -1076,34 +1076,34 @@ function failureText(failure, t) {
 //#endregion
 //#region \0voice-anywhere-css:/home/yanhongbin/global-dsh-project/dsh-voice-anywhere/src/vendor/voice-input/VoiceInput.module.css?va-module
 var VoiceInput_module_default = {
+	"roundButton": "ZlutEW_roundButton",
+	"summaryTitle": "ZlutEW_summaryTitle",
+	"progress": "ZlutEW_progress",
+	"deviceSelectMeter": "ZlutEW_deviceSelectMeter",
+	"summaryRow": "ZlutEW_summaryRow",
+	"waveform": "ZlutEW_waveform",
+	"deviceMeter": "ZlutEW_deviceMeter",
+	"sourceChoice": "ZlutEW_sourceChoice",
+	"deviceError": "ZlutEW_deviceError",
+	"preparation": "ZlutEW_preparation",
+	"settingsCard": "ZlutEW_settingsCard",
+	"deviceField": "ZlutEW_deviceField",
+	"inputLevel": "ZlutEW_inputLevel",
+	"trigger": "ZlutEW_trigger",
+	"inlineAction": "ZlutEW_inlineAction",
+	"captureRow": "ZlutEW_captureRow",
+	"downloadFailure": "ZlutEW_downloadFailure",
 	"deviceRow": "ZlutEW_deviceRow",
 	"preparationError": "ZlutEW_preparationError",
-	"captureRow": "ZlutEW_captureRow",
-	"stepBody": "ZlutEW_stepBody",
-	"progress": "ZlutEW_progress",
-	"preferences": "ZlutEW_preferences",
 	"metric": "ZlutEW_metric",
-	"deviceError": "ZlutEW_deviceError",
-	"inputLevel": "ZlutEW_inputLevel",
-	"deviceField": "ZlutEW_deviceField",
-	"preparationActions": "ZlutEW_preparationActions",
-	"deviceSelectMeter": "ZlutEW_deviceSelectMeter",
-	"deviceMeter": "ZlutEW_deviceMeter",
-	"waveform": "ZlutEW_waveform",
+	"stepBody": "ZlutEW_stepBody",
 	"activityMessage": "ZlutEW_activityMessage",
-	"stepProgress": "ZlutEW_stepProgress",
-	"preparation": "ZlutEW_preparation",
-	"trigger": "ZlutEW_trigger",
-	"steps": "ZlutEW_steps",
-	"sourceChoice": "ZlutEW_sourceChoice",
 	"triggerAnchor": "ZlutEW_triggerAnchor",
-	"inlineAction": "ZlutEW_inlineAction",
-	"summaryRow": "ZlutEW_summaryRow",
-	"settingsCard": "ZlutEW_settingsCard",
-	"downloadFailure": "ZlutEW_downloadFailure",
-	"setupEstimate": "ZlutEW_setupEstimate",
-	"roundButton": "ZlutEW_roundButton",
-	"summaryTitle": "ZlutEW_summaryTitle"
+	"steps": "ZlutEW_steps",
+	"preparationActions": "ZlutEW_preparationActions",
+	"stepProgress": "ZlutEW_stepProgress",
+	"preferences": "ZlutEW_preferences",
+	"setupEstimate": "ZlutEW_setupEstimate"
 };
 //#endregion
 //#region src/vendor/voice-input/Waveform.tsx
@@ -3876,6 +3876,16 @@ function planSubmit() {
 * declares no runtime dependency on any official package: the button and the
 * capture pipeline are compiled into this artifact by `build.mjs`.
 */
+/**
+* Rules that must beat the platform's control styles regardless of load order.
+*
+* The official component sizes its icon buttons to 28/32px with `padding: 0`,
+* but the platform's `.sm` rule also sets `padding: 0 10px` at the same
+* specificity. Whichever stylesheet lands last wins, and when the platform wins
+* the icons are squeezed into a few pixels. A descendant selector raises the
+* specificity above `.sm`, so the outcome no longer depends on ordering.
+*/
+const PORTAL_CSS = [`[data-voice-anywhere-root] .${VoiceInput_module_default.trigger}`, `[data-voice-anywhere-root] .${VoiceInput_module_default.roundButton}`].join(", ") + " { padding: 0; }\n";
 /** Rules this plugin adds on top of the reused stylesheet. */
 const EXTRA_CSS = `
 /* While a plain field is being recorded, the row replaces its text. */
@@ -3922,7 +3932,7 @@ function apply(ctx) {
 		ctx.effect(() => {
 			const style = document.createElement("style");
 			style.setAttribute("data-voice-anywhere-style", "");
-			style.textContent = `${VOICE_ANYWHERE_CSS}${EXTRA_CSS}`;
+			style.textContent = `${VOICE_ANYWHERE_CSS}${PORTAL_CSS}${EXTRA_CSS}`;
 			document.head.appendChild(style);
 			return () => {
 				style.remove();

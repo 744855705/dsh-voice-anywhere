@@ -22,6 +22,11 @@ declare module 'react' {
   }
 }
 
+declare module '*.module.css' {
+  const classes: Record<string, string>
+  export default classes
+}
+
 declare module 'react/jsx-runtime' {
   export const Fragment: unknown
   export function jsx(type: unknown, props: unknown, key?: unknown): unknown

@@ -19,6 +19,7 @@ import { readBaseline, readBootSignals, writeBaseline } from './official-baselin
 import { setVerdict } from './stale.ts'
 import { createFace } from './face.ts'
 import { FloatingMic } from './floating/view.ts'
+import voiceCss from './vendor/voice-input/VoiceInput.module.css'
 import { DICTS, NAMESPACE } from './locales.ts'
 import { createRecorder } from './recording.ts'
 import { SettingsSection } from './settings/section.ts'
@@ -31,6 +32,20 @@ import { planSubmit } from './submit.ts'
 
 /** Build-generated stylesheet of the reused official component. */
 declare const VOICE_ANYWHERE_CSS: string
+
+/**
+ * Rules that must beat the platform's control styles regardless of load order.
+ *
+ * The official component sizes its icon buttons to 28/32px with `padding: 0`,
+ * but the platform's `.sm` rule also sets `padding: 0 10px` at the same
+ * specificity. Whichever stylesheet lands last wins, and when the platform wins
+ * the icons are squeezed into a few pixels. A descendant selector raises the
+ * specificity above `.sm`, so the outcome no longer depends on ordering.
+ */
+const PORTAL_CSS = [
+  `[data-voice-anywhere-root] .${voiceCss.trigger}`,
+  `[data-voice-anywhere-root] .${voiceCss.roundButton}`,
+].join(', ') + ' { padding: 0; }\n'
 
 /** Rules this plugin adds on top of the reused stylesheet. */
 const EXTRA_CSS = `
@@ -83,7 +98,7 @@ export function apply(ctx: any): void {
     ctx.effect(() => {
       const style = document.createElement('style')
       style.setAttribute('data-voice-anywhere-style', '')
-      style.textContent = `${VOICE_ANYWHERE_CSS}${EXTRA_CSS}`
+      style.textContent = `${VOICE_ANYWHERE_CSS}${PORTAL_CSS}${EXTRA_CSS}`
       document.head.appendChild(style)
       return () => { style.remove() }
     })
