@@ -14,9 +14,9 @@ let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-
 var _voice_anywhere_build_default = {
 	"official": "0.2.3-alpha.2",
 	"officialHash": "3709d710fa82bc338d71d35774a45a86975a65b68408d512f4b0b1fd134136db",
-	"builtAt": "2026-11-27T08:52:49.582Z",
+	"builtAt": "2026-11-27T08:55:22.763Z",
 	"engines": ">=0.2.2-rc.1 <=0.5.0",
-	"srcHash": "1c3e38eb2fe5a66a"
+	"srcHash": "6eb3c1db8d738f05"
 };
 //#endregion
 //#region src/controls.ts
@@ -1076,34 +1076,34 @@ function failureText(failure, t) {
 //#endregion
 //#region \0voice-anywhere-css:/home/yanhongbin/global-dsh-project/dsh-voice-anywhere/src/vendor/voice-input/VoiceInput.module.css?va-module
 var VoiceInput_module_default = {
-	"triggerAnchor": "ZlutEW_triggerAnchor",
-	"deviceSelectMeter": "ZlutEW_deviceSelectMeter",
-	"deviceError": "ZlutEW_deviceError",
-	"inputLevel": "ZlutEW_inputLevel",
-	"preparationActions": "ZlutEW_preparationActions",
-	"progress": "ZlutEW_progress",
-	"metric": "ZlutEW_metric",
-	"roundButton": "ZlutEW_roundButton",
-	"trigger": "ZlutEW_trigger",
-	"activityMessage": "ZlutEW_activityMessage",
-	"inlineAction": "ZlutEW_inlineAction",
-	"stepProgress": "ZlutEW_stepProgress",
 	"deviceRow": "ZlutEW_deviceRow",
+	"settingsCard": "ZlutEW_settingsCard",
+	"activityMessage": "ZlutEW_activityMessage",
+	"deviceSelectMeter": "ZlutEW_deviceSelectMeter",
+	"inputLevel": "ZlutEW_inputLevel",
+	"waveform": "ZlutEW_waveform",
+	"deviceField": "ZlutEW_deviceField",
 	"summaryRow": "ZlutEW_summaryRow",
+	"trigger": "ZlutEW_trigger",
+	"roundButton": "ZlutEW_roundButton",
+	"progress": "ZlutEW_progress",
 	"summaryTitle": "ZlutEW_summaryTitle",
+	"preparationActions": "ZlutEW_preparationActions",
 	"preparationError": "ZlutEW_preparationError",
 	"stepBody": "ZlutEW_stepBody",
+	"deviceError": "ZlutEW_deviceError",
 	"preparation": "ZlutEW_preparation",
-	"captureRow": "ZlutEW_captureRow",
 	"steps": "ZlutEW_steps",
-	"preferences": "ZlutEW_preferences",
-	"sourceChoice": "ZlutEW_sourceChoice",
-	"waveform": "ZlutEW_waveform",
-	"settingsCard": "ZlutEW_settingsCard",
 	"setupEstimate": "ZlutEW_setupEstimate",
-	"deviceField": "ZlutEW_deviceField",
+	"triggerAnchor": "ZlutEW_triggerAnchor",
+	"captureRow": "ZlutEW_captureRow",
 	"deviceMeter": "ZlutEW_deviceMeter",
-	"downloadFailure": "ZlutEW_downloadFailure"
+	"stepProgress": "ZlutEW_stepProgress",
+	"downloadFailure": "ZlutEW_downloadFailure",
+	"preferences": "ZlutEW_preferences",
+	"metric": "ZlutEW_metric",
+	"inlineAction": "ZlutEW_inlineAction",
+	"sourceChoice": "ZlutEW_sourceChoice"
 };
 //#endregion
 //#region src/vendor/voice-input/Waveform.tsx
