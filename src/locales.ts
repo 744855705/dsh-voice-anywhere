@@ -5,7 +5,7 @@
  * command label and the settings page's copy. Keys are flat: the locale service
  * indexes dictionaries literally, so `'settings.label'` is the key, not a path.
  */
-import { de, en, es, fr, ja, pt, ru, zh } from 'voice-official/locales.ts'
+import { de, en, es, fr, ja, pt, ru, zh } from './vendor/voice-input/locales.ts'
 
 /** The plugin's locale namespace. */
 export const NAMESPACE = 'voice-anywhere'
@@ -36,7 +36,13 @@ const SETTINGS_TEXT: Record<'zh' | 'en', Record<string, string>> = {
     'settings.captured': '已添加：',
     'settings.rejected': '这个组合无法用作触发键：',
     'settings.remove': '删除',
-    'settings.close': '关闭此设置页',
+    'settings.close': '隐藏此设置页',
+    'settings.stale': '官方语音组件已更新：构建 {built}，当前 {installed}。当前仍在使用旧副本，建议更新插件。',
+    'settings.staleUnknown': '无法核对官方语音组件版本（{reason}），当前按原样运行。',
+    'settings.staleBroken': '官方组件与当前副本不兼容，浮动麦克风已停用，请更新插件。',
+    'badge.mismatch': '官方语音组件已更新，建议更新插件',
+    'badge.unknown': '无法核对官方语音组件版本',
+    'badge.broken': '官方组件与当前副本不兼容，浮动麦克风已停用',
   },
   en: {
     'settings.label': 'Voice input',
@@ -51,9 +57,25 @@ const SETTINGS_TEXT: Record<'zh' | 'en', Record<string, string>> = {
     'settings.captured': 'Added:',
     'settings.rejected': 'That combination cannot be a trigger:',
     'settings.remove': 'Remove',
-    'settings.close': 'Close this page',
+    'settings.close': 'Hide this page',
+    'settings.stale': 'The official voice UI changed: built {built}, installed {installed}. This copy still runs; update the plugin when you can.',
+    'settings.staleUnknown': 'Could not verify the official voice UI ({reason}); running this copy as-is.',
+    'settings.staleBroken': 'The official UI and this copy disagree; the floating microphone is disabled. Please update the plugin.',
+    'badge.mismatch': 'The official voice UI changed; consider updating the plugin',
+    'badge.unknown': 'Could not verify the official voice UI',
+    'badge.broken': 'Incompatible with the official UI; the floating microphone is disabled',
   },
 } as const
+
+/**
+ * Substitute `{name}` placeholders in one message.
+ * @param template - localized text.
+ * @param values - replacement values by placeholder name.
+ * @returns the filled text.
+ */
+export function format(template: string, values: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/gu, (match, key: string) => values[key] ?? match)
+}
 
 /** Locale dictionaries installed for every shipped language. */
 export const DICTS = {

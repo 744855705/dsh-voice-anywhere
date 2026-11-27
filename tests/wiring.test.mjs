@@ -22,6 +22,8 @@ const stubs = {
     useRef: initial => ({ current: initial }),
     useEffect: () => {},
     useLayoutEffect: () => {},
+    // The vendored control is wrapped in an error boundary, which extends this.
+    Component: class { constructor(props) { this.props = props; this.state = {} } setState() {} },
   }, { get: (target, key) => key in target ? target[key] : () => {} }),
   'react/jsx-runtime': { jsx: () => null, jsxs: () => null, Fragment: '#fragment' },
   'react-dom': { createPortal: node => node },

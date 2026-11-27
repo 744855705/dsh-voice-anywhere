@@ -28,7 +28,7 @@ try {
   assert.equal(readFileSync(file, 'utf8'), DEFAULT_BODY)
   ok('the first run creates the working directory and an empty configuration')
 
-  assert.deepEqual(JSON.parse(readConfigBody(root)), { allow: [], disable: [] })
+  assert.deepEqual(JSON.parse(readConfigBody(root)), { allow: [], disable: [], triggers: [], submit: [] })
   ok('the route body parses as the expected shape')
 
   writeFileSync(file, '{"allow":["#x"],"disable":["dialog"]}')

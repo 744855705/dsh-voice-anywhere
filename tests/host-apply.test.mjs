@@ -34,7 +34,7 @@ try {
   ok('apply registers one exact route through an effect')
 
   const file = join(root, 'voice-anywhere', 'config.json')
-  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { allow: [], disable: [] })
+  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { allow: [], disable: [], triggers: [], submit: [] })
   ok('the first run creates the profile working directory and an empty file')
 
   const empty = await routes[0].resource()

@@ -7,6 +7,7 @@
  * page refresh without rebuilding or restarting.
  */
 import { createHash } from 'node:crypto'
+import { readOfficial } from './official.mjs'
 import { basename } from 'node:path'
 import { closeSync, mkdirSync, openSync, readFileSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
@@ -18,7 +19,7 @@ export const WORK_DIR = 'voice-anywhere'
 export const CONFIG_FILE = 'config.json'
 
 /** Written when the file does not exist yet: nothing opted in. */
-export const DEFAULT_BODY = `${JSON.stringify({ allow: [], disable: [] }, null, 2)}\n`
+export const DEFAULT_BODY = `${JSON.stringify({ allow: [], disable: [], triggers: [], submit: [] }, null, 2)}\n`
 
 /**
  * Locate the profile this process serves. The launcher provides it as a
@@ -103,5 +104,10 @@ export function readConfigPayload(profileDir) {
   // page the user closed.
   const revision = createHash('sha256').update(body).digest('hex').slice(0, 16)
   const parsed = JSON.parse(body)
-  return { payload: JSON.stringify({ ...parsed, revision, profile: basename(profileDir) }), revision }
+  // `official` answers one question for the client: is the vendored copy still
+  // the installed code? It is computed per request so an upgrade needs no restart.
+  return {
+    payload: JSON.stringify({ ...parsed, revision, profile: basename(profileDir), official: readOfficial() }),
+    revision,
+  }
 }

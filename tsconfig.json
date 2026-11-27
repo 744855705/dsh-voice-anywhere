@@ -9,10 +9,12 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "exactOptionalPropertyTypes": false,
+    "jsx": "react-jsx",
     "noEmit": true,
     "skipLibCheck": true,
     "types": [],
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
-  "include": ["src", "types"]
+  "include": ["src", "types"],
+  "exclude": ["src/vendor/voice-input"]
 }

@@ -1,0 +1,21 @@
+{
+  "package": "@deepseek-ai/dsh-experimental-client-ui-voice-input",
+  "version": "0.2.3-alpha.2",
+  "license": "MIT",
+  "hash": "3709d710fa82bc338d71d35774a45a86975a65b68408d512f4b0b1fd134136db",
+  "files": {
+    "audio.ts": "890d7cf703ad664fc9aeb763ff6cd8d9baafc90e9ebae08d354c3f9458bf1b27",
+    "failure-text.ts": "671eb2cd4cd3a09690283157042923f2637a38cacf47c8e24271daff872a2809",
+    "microphone-device.ts": "a8c9db72f4e259e00da74eed152c5a25f2701d9e65a38845e15906e94ca5e935",
+    "readiness.ts": "d48196cd76e59e5e739aaa839458ec6a697c2b8499cb5d87a855571d3f9450ac",
+    "locales.ts": "9bd5003c67583a8010d61b322c6911b54fb4eaf20843bcfec026f169c3005f66",
+    "MicrophonePicker.tsx": "0ebc6f1253c45fda7bbbd0a605e68c00b63d6b221442e224a01048c65eae568b",
+    "PreparationCard.tsx": "1d764bd539d515d4791a16c2dc4382179a54e4ce5abd7113da4754772b685242",
+    "VoiceInput.module.css": "e74fe84e030790f634a810c1cba27575f2e33cf2bcd6d728f23ff8818ab075c3",
+    "VoiceInput.tsx": "858d8b4106bdfb14c066977a372695bae1a74c38399f71eee20fcfff7bf01711",
+    "VoiceSetupDialog.tsx": "8655afb13df37c6e64fea649e011f435f02a60d502395f397069a2fe89154f75",
+    "VoiceSetupPrompt.tsx": "be7f396afe52fa8271520d81e96986f1077423ed66b0e6d27ef68f485123b19e",
+    "Waveform.tsx": "c4c6adfa8b60dd5193de92a325d2ba07d670e5021cd7607e3501f843e3b767d3"
+  },
+  "vendoredAt": "2026-11-26T23:57:35.129Z"
+}

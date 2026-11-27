@@ -13,6 +13,19 @@ declare module 'react' {
   export function useRef<T>(initial: T): { current: T }
   export function useEffect(effect: () => void | (() => void), deps?: readonly unknown[]): void
   export function useLayoutEffect(effect: () => void | (() => void), deps?: readonly unknown[]): void
+  export class Component<P = Record<string, unknown>, S = Record<string, unknown>> {
+    constructor(props: P)
+    readonly props: P
+    state: S
+    setState(next: S | ((previous: S) => S)): void
+    render(): unknown
+  }
+}
+
+declare module 'react/jsx-runtime' {
+  export const Fragment: unknown
+  export function jsx(type: unknown, props: unknown, key?: unknown): unknown
+  export function jsxs(type: unknown, props: unknown, key?: unknown): unknown
 }
 
 declare module 'react-dom' {
@@ -33,7 +46,7 @@ declare module '@deepseek-ai/dsh-client-ui-primitives' {
 }
 
 declare module 'voice-anywhere:build' {
-  const build: { readonly official: string; readonly builtAt: string; readonly engines: string; readonly srcHash: string }
+  const build: { readonly official: string; readonly builtAt: string; readonly engines: string; readonly srcHash: string; readonly officialHash: string }
   export default build
 }
 

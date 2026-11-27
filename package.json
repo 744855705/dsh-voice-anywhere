@@ -23,7 +23,9 @@
     "src",
     "scripts",
     "tsconfig.json",
-    "types"
+    "types",
+    "shared",
+    "src/vendor"
   ],
   "dsh": {
     "bundle": {
@@ -62,6 +64,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node scripts/run-tests.mjs",
     "check-build": "node scripts/check-build.mjs",
-    "verify": "npm run typecheck && npm test && npm run check-build"
+    "verify": "npm run typecheck && npm test && npm run check-vendor && npm run check-build",
+    "vendor": "node scripts/vendor.mjs",
+    "check-vendor": "node scripts/check-vendor.mjs"
   }
 }

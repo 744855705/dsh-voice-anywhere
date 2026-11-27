@@ -6,8 +6,7 @@
  * official button. The device preference is the one the official picker saved:
  * it is re-read on every capture because that picker writes the same key.
  */
-import { Recording } from 'voice-official/audio.ts'
-import { createMicrophoneDeviceStore } from 'voice-official/microphone-device.ts'
+import { Recording, createMicrophoneDeviceStore } from './vendor/index.ts'
 
 /** Persistence key owned by the official microphone picker. */
 const DEVICE_KEY = 'dsh.voice-input.microphone'

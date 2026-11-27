@@ -20,8 +20,6 @@ import { sourceHash } from './scripts/source-hash.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const MANIFEST = JSON.parse(readFileSync(join(HERE, 'package.json'), 'utf8'))
-const VOICE_BUNDLE = '@deepseek-ai/dsh-experimental-voice-input-bundle'
-const VOICE_CLIENT = '@deepseek-ai/dsh-experimental-client-ui-voice-input'
 const EXTERNALS = [
   'react', 'react/jsx-runtime', 'react-dom', 'react-dom/client',
   '@deepseek-ai/dsh-client-store', '@deepseek-ai/dsh-client-ui-primitives',
@@ -51,22 +49,6 @@ function installAnchors() {
     }
   }
   return [...new Set(anchors)]
-}
-
-/**
- * Resolve the installed voice client package through the bundle that depends on it.
- * @param anchors - installation directories.
- * @returns its directory and version.
- */
-function resolveVoice(anchors) {
-  for (const anchor of anchors) {
-    try {
-      const bundlePath = createRequire(join(anchor, 'noop.js')).resolve(`${VOICE_BUNDLE}/package.json`)
-      const voicePath = createRequire(bundlePath).resolve(`${VOICE_CLIENT}/package.json`)
-      return { directory: dirname(voicePath), version: JSON.parse(readFileSync(voicePath, 'utf8')).version }
-    } catch { /* try the next anchor */ }
-  }
-  fail(`cannot resolve ${VOICE_CLIENT}: is ${VOICE_BUNDLE} installed for the running DSH?`)
 }
 
 /**
@@ -102,7 +84,6 @@ function compileSheet(lightning, file, sheets) {
 async function main() {
   const anchors = installAnchors()
   if (anchors.length === 0) fail('cannot locate the DSH installation: set DSH_INSTALL_DIR')
-  const voice = resolveVoice(anchors)
   const rolldownPath = resolveTool('rolldown', anchors)
   const lightningPath = resolveTool('lightningcss', anchors)
   const { rolldown } = await import(pathToFileURL(rolldownPath).href)
@@ -121,8 +102,10 @@ async function main() {
     },
   }
 
+  const provenance = JSON.parse(readFileSync(join(HERE, 'src/vendor/voice-input/PROVENANCE.json'), 'utf8'))
   const build = {
-    official: voice.version,
+    official: provenance.version,
+    officialHash: provenance.hash,
     builtAt: new Date().toISOString(),
     engines: MANIFEST.engines?.dsh ?? null,
     // Hash of everything that can change behaviour. `npm run check-build`
@@ -139,7 +122,6 @@ async function main() {
     input: join(HERE, 'src/client.ts'),
     external: EXTERNALS,
     plugins: [cssPlugin, stampPlugin],
-    resolve: { alias: { 'voice-official': join(voice.directory, 'src/client') } },
     logLevel: 'warn',
   })
   const generated = await bundle.generate({ format: 'cjs', exports: 'named' })
@@ -153,8 +135,10 @@ async function main() {
     '  factory(require) {',
     '    var module = { exports: {} };',
     '    var exports = module.exports;',
-    chunk.code,
+    // Declared before the chunk, not after: a `const` placed after `return`
+    // never initializes, so every read threw and the stylesheet stayed empty.
     `    const ${CSS_GLOBAL} = ${JSON.stringify(sheets.join('\n'))};`,
+    chunk.code,
     '    return module.exports;',
     '  },',
     '});',
@@ -162,8 +146,15 @@ async function main() {
   ].join('\n')
 
   const outFile = join(HERE, 'client.js')
+  const declaration = code.indexOf(`const ${CSS_GLOBAL}`)
+  // The stylesheet is read through a template literal in the plugin code.
+  const firstUse = code.indexOf('${' + CSS_GLOBAL + '}')
+  if (declaration < 0 || firstUse < 0 || declaration > firstUse) {
+    fail('generated bundle declares the stylesheet after its first use')
+  }
+
   writeFileSync(outFile, code)
-  console.log(`[voice-anywhere] official ${voice.version} · ${sheets.length} stylesheet(s) · ${statSync(outFile).size} bytes → client.js`)
+  console.log(`[voice-anywhere] official ${provenance.version} (${provenance.hash.slice(0, 12)}) · ${sheets.length} stylesheet(s) · ${statSync(outFile).size} bytes → client.js`)
 }
 
 /**

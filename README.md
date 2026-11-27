@@ -4,6 +4,14 @@
 
 官方对话输入框始终由官方插件负责，本插件不接管、不修改、也无法关闭它——那是官方逻辑。
 
+## 安装
+
+```bash
+dsh plugin install github:744855705/dsh-voice-anywhere#v0.1.0
+```
+
+装好后刷新页面即可使用；「设置 → 语音输入」里可以直接录制触发键。
+
 ## 哪些位置自动可用
 
 | 位置 | 行为 |
@@ -113,11 +121,34 @@
 
 ```bash
 npm install          # 只装 devDependencies（typescript）
-npm run build        # 产出 client.js（内联官方组件与样式，并写入源码哈希）
+npm run vendor       # 从本机官方包复制 UI 源码到 src/vendor（显式、可审、带哈希）
+npm run build        # 产出 client.js（不读官方包，只编译本仓库源码）
 npm run typecheck    # tsc --noEmit，0 错误
 npm test             # 逐个跑 tests/*.test.mjs
+npm run check-vendor # 校验 vendored 代码与本机官方包是否一致
 npm run check-build  # 校验 client.js 与源码一致（防止改了没重建）
-npm run verify       # 以上三项串起来，CI 跑的就是它
+npm run verify       # 以上几项串起来，CI 跑的就是它
+```
+
+## 官方代码的复用
+
+界面来自官方语音插件，但**不再在构建时读取官方包**：`npm run vendor` 把用到的 12 个文件复制到 `src/vendor/voice-input/`，并把上游版本与每文件 sha256 写进 `PROVENANCE.json`。构建只编译本仓库源码，任何机器可复现。
+
+判断「要不要更新插件」用**代码哈希**，不用版本号（DSH 一周一版，版本变了不代表这些文件变了）：
+
+| 状态 | 判据 | 表现 |
+|---|---|---|
+| match | 本机官方包哈希 == 构建时哈希 | 正常运行 |
+| mismatch | 两者不同 | **照常可用**，麦克风旁出现小圆点，设置页顶部黄色提示条，控制台一条 warn |
+| unknown | 宿主读不到官方包 | 照常可用，设置页灰色提示 |
+| broken | 官方组件与当前副本不兼容，渲染抛错 | 浮动控件停用（错误边界接管），设置页红色提示 |
+
+遇到 mismatch 的更新流程：
+
+```bash
+npm run vendor        # 复制新代码，打印逐文件 diff
+npm run verify        # 含 check-vendor，不一致会红
+npm run build         # 重新产出 client.js
 ```
 
 ### 结构
@@ -138,6 +169,10 @@ npm run verify       # 以上三项串起来，CI 跑的就是它
 | `src/floating/use-surface-control.ts` | 控件的状态与同步 |
 | `src/floating/view.ts` | 只负责渲染 portal |
 | `src/settings/section.ts`、`styles.ts` | 设置页的行为与排版 |
+| `src/vendor/` | 官方 UI 的逐字复制件与来源清单，只读 |
+| `src/guard.ts`、`src/stale.ts` | 官方代码一致性判定与共享状态 |
+| `src/components/` | 提示条与错误边界 |
+| `shared/` | 构建、宿主与校验脚本共用的哈希与文件清单 |
 | `src/trigger/expression.ts` | 触发器表达式的解析与匹配（纯函数） |
 | `src/trigger/engine.ts` | 捕获阶段的键盘/鼠标监听 |
 | `src/targets.ts`、`src/controls.ts`、`src/speech.ts`、`src/recording.ts` | 输入框识别与写入、控件状态契约、语音服务、录音 |

@@ -14,6 +14,8 @@ import { planActivation } from './activate.ts'
 import { isCapturing } from './capture-state.ts'
 import { currentConfig, loadConfig } from './config.ts'
 import { installDiagnostics, note, report } from './diagnostics.ts'
+import { evaluateOfficial } from './guard.ts'
+import { setVerdict } from './stale.ts'
 import { createFace } from './face.ts'
 import { FloatingMic } from './floating/view.ts'
 import { DICTS, NAMESPACE } from './locales.ts'
@@ -122,6 +124,12 @@ export function apply(ctx: any): void {
       let section: (() => void) | null = null
       let cancelled = false
       void loadConfig().then(config => {
+        const official = evaluateOfficial(config.official, build.officialHash)
+        setVerdict(official)
+        if (official.state === 'mismatch') {
+          console.warn(`[voice-anywhere] 官方语音组件已更新（构建 ${official.built.slice(0, 8)} · 当前 ${official.installed?.slice(0, 8)}），当前仍在使用旧副本，建议更新插件。`)
+        }
+        note({ official })
         // The file decides whether the page exists; closing it from inside only
         // silences this exact revision.
         if (cancelled || !config.settingsPage || isPageClosed(config.revision, config.profile)) return

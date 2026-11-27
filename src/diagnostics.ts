@@ -6,6 +6,8 @@
  * Diagnostics never affect behaviour — a failed publish is swallowed on purpose.
  */
 
+import { verdictOf } from './stale.ts'
+
 /** One recorded failure. */
 export interface DiagnosticEvent {
   readonly kind: string
@@ -26,7 +28,7 @@ let events: DiagnosticEvent[] = []
 /** Publish the current snapshot, ignoring a window that cannot hold it. */
 function publish(): void {
   try {
-    ;(window as any).__voiceAnywhere = { ...facts, events: [...events] } satisfies DiagnosticSnapshot
+    ;(window as any).__voiceAnywhere = withStale({ ...facts, events: [...events] }) satisfies DiagnosticSnapshot
   } catch {
     // A diagnostic surface must never be able to break the feature.
   }
@@ -64,7 +66,16 @@ export function note(patch: Record<string, unknown>): void {
   publish()
 }
 
+/**
+ * Attach the official-code verdict to the published surface.
+ * @param value - current snapshot facts.
+ * @returns the facts plus the stale state.
+ */
+function withStale<T extends Record<string, unknown>>(value: T): T & { stale: unknown } {
+  return { ...value, stale: verdictOf() }
+}
+
 /** @returns a copy of the published surface. */
 export function snapshot(): DiagnosticSnapshot {
-  return { ...facts, events: [...events] }
+  return withStale({ ...facts, events: [...events] })
 }

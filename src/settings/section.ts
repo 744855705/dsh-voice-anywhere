@@ -11,6 +11,8 @@ import { setCapturing as setGlobalCapturing } from '../capture-state.ts'
 import { currentConfig } from '../config.ts'
 import { closePage, loadSubmitText, loadTriggerText, saveSubmitText, saveTriggerText } from '../storage.ts'
 import { expressionOf } from '../trigger/expression.ts'
+import { Notice } from '../components/notice.ts'
+import { staleNotice } from './stale-notice.ts'
 import { STYLE } from './styles.ts'
 
 /** The two independent trigger lists the page edits. */
@@ -104,7 +106,10 @@ export function SettingsSection(props: any) {
     onClose?.()
   }
 
+  const notice = staleNotice(t)
+
   return h('div', { style: STYLE.page },
+    notice === null ? null : h(Notice, notice),
     h('p', { style: STYLE.hint }, t('settings.hint')),
     h(TriggerColumn, {
       t,

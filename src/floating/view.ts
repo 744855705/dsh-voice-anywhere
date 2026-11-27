@@ -6,7 +6,10 @@
  */
 import { createElement as h } from 'react'
 import { createPortal } from 'react-dom'
-import { VoiceInput } from 'voice-official/VoiceInput.tsx'
+import { VoiceInput } from '../vendor/index.ts'
+import { ErrorBoundary } from '../components/error-boundary.ts'
+import { report } from '../diagnostics.ts'
+import { isBlocked, markBlocked, verdictOf } from '../stale.ts'
 import { insertText } from '../targets.ts'
 import { useSurfaceControl } from './use-surface-control.ts'
 
@@ -57,6 +60,23 @@ export function FloatingMic(props: any) {
     },
   }
 
+  // A copy that no longer matches is still usable until it proves otherwise, so
+  // the badge reports the state and only a render failure takes the control down.
+  const state = isBlocked() ? 'broken' : verdictOf()?.state ?? 'unknown'
+  const badge = state === 'match' ? null : h('span', {
+    title: t(`badge.${state}`),
+    style: {
+      position: 'absolute',
+      top: '-2px',
+      right: '-4px',
+      width: '6px',
+      height: '6px',
+      borderRadius: '50%',
+      background: state === 'unknown' ? '#ffbb00' : '#e5484d',
+      pointerEvents: 'none',
+    },
+  })
+
   // The wrapper never takes a click: only the control inside does. A transparent
   // strip that accepted clicks would cover the dialog's own buttons underneath.
   return createPortal(h('div', {
@@ -76,7 +96,14 @@ export function FloatingMic(props: any) {
       zIndex: 1050,
       pointerEvents: 'none',
     },
-  }, h('div', {
+  }, [
+    h(ErrorBoundary, {
+      key: 'control',
+      onError: (error: unknown) => {
+        markBlocked()
+        report('render', error)
+      },
+    }, h('div', {
     style: {
       pointerEvents: 'auto',
       width: '100%',
@@ -103,5 +130,7 @@ export function FloatingMic(props: any) {
     useMicrophoneDevice,
     usePluginNavigation,
     t,
-  }))), document.body)
+  }))),
+    badge,
+  ]), document.body)
 }

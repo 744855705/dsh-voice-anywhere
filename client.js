@@ -3,6 +3,7 @@ window.__ModuleLoader__.load({
   factory(require) {
     var module = { exports: {} };
     var exports = module.exports;
+    const VOICE_ANYWHERE_CSS = ".ZlutEW_trigger {\n  flex: none;\n  width: 28px;\n  padding: 0;\n}\n\n.ZlutEW_triggerAnchor {\n  flex: none;\n  display: inline-flex;\n}\n\n.ZlutEW_captureRow {\n  align-items: center;\n  gap: 12px;\n  width: 100%;\n  min-width: 0;\n  min-height: 34px;\n  display: flex;\n}\n\n.ZlutEW_roundButton {\n  corner-shape: round;\n  background: var(--dsw-specific-selector);\n  border-radius: 50%;\n  flex: none;\n  width: 32px;\n  height: 32px;\n  padding: 0;\n}\n\n@media (hover: hover) {\n  .ZlutEW_roundButton:hover:not(:disabled) {\n    background: var(--dsw-alias-interactive-bg-hover-solid);\n  }\n}\n\n.ZlutEW_waveform {\n  width: 0;\n  min-width: 24px;\n  height: 24px;\n  color: var(--dsw-alias-label-secondary);\n  flex: 1;\n  display: block;\n}\n\n.ZlutEW_activityMessage {\n  min-width: 0;\n  color: var(--dsw-alias-label-secondary);\n  white-space: nowrap;\n  text-overflow: ellipsis;\n  flex: 1;\n  align-items: center;\n  gap: 8px;\n  font-size: 12px;\n  display: flex;\n  overflow: hidden;\n}\n\n.ZlutEW_inlineAction {\n  flex: none;\n}\n\n.ZlutEW_preparation {\n  border: .5px solid var(--dsw-alias-border-l1);\n  border-radius: 10px;\n  flex-direction: column;\n  gap: 10px;\n  margin: 12px 0;\n  padding: 14px;\n  font-size: 13px;\n  display: flex;\n}\n\n.ZlutEW_preparation p {\n  margin: 0;\n}\n\n.ZlutEW_preparationActions {\n  gap: 8px;\n  display: flex;\n}\n\n.ZlutEW_preparationActions:empty {\n  display: none;\n}\n\n.ZlutEW_preparationError {\n  color: var(--dsw-alias-state-error-primary);\n  overflow-wrap: anywhere;\n  font-size: 12px;\n}\n\n.ZlutEW_downloadFailure {\n  overflow-wrap: anywhere;\n  gap: 6px;\n  display: grid;\n}\n\n.ZlutEW_summaryRow {\n  flex-wrap: wrap;\n  gap: 4px;\n  height: auto;\n  min-height: 28px;\n}\n\n.ZlutEW_summaryTitle {\n  flex: 1;\n  min-width: 0;\n}\n\n.ZlutEW_metric {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n}\n\n.ZlutEW_progress {\n  width: 100%;\n  height: 6px;\n  accent-color: var(--dsw-alias-state-business-primary);\n}\n\n.ZlutEW_steps {\n  flex-direction: column;\n  gap: 14px;\n  margin: 0;\n  padding: 16px 0 2px;\n  list-style: none;\n  display: flex;\n}\n\n.ZlutEW_steps li {\n  align-items: flex-start;\n  gap: 10px;\n  line-height: 18px;\n  display: flex;\n}\n\n.ZlutEW_steps li > :first-child {\n  margin-top: 1px;\n}\n\n.ZlutEW_steps li[data-step-state=\"pending\"] {\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.ZlutEW_stepBody {\n  flex: 1;\n  min-width: 0;\n}\n\n.ZlutEW_stepProgress {\n  flex-direction: column;\n  gap: 6px;\n  margin-top: 6px;\n  display: flex;\n}\n\n.ZlutEW_stepProgress small {\n  color: var(--dsw-alias-label-tertiary);\n  overflow-wrap: anywhere;\n  font-size: 11px;\n}\n\n.ZlutEW_preferences {\n  gap: 12px;\n  margin: 18px 0;\n  font-size: 13px;\n  display: grid;\n}\n\n.ZlutEW_deviceRow, .ZlutEW_preferences label, .ZlutEW_sourceChoice label {\n  grid-template-columns: 100px minmax(120px, 280px);\n  align-items: center;\n  gap: 12px;\n  display: grid;\n}\n\n.ZlutEW_preferences select, .ZlutEW_sourceChoice select {\n  border: .5px solid var(--dsw-alias-border-l1);\n  color: inherit;\n  font: inherit;\n  background: none;\n  border-radius: 6px;\n  padding: 6px 10px;\n}\n\n.ZlutEW_sourceChoice {\n  gap: 6px;\n  display: grid;\n}\n\n.ZlutEW_preferences p {\n  margin: 0;\n}\n\n.ZlutEW_settingsCard {\n  border: .5px solid var(--dsw-alias-border-l1);\n  border-radius: 10px;\n  padding: 16px;\n  list-style: none;\n}\n\n.ZlutEW_settingsCard > p {\n  color: var(--dsw-alias-label-secondary);\n  margin: 8px 0 0;\n  font-size: 13px;\n}\n\n.ZlutEW_setupEstimate {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-secondary);\n  border-radius: 8px;\n  gap: 10px;\n  padding: 12px;\n  line-height: 1.6;\n  display: grid;\n}\n\n.ZlutEW_setupEstimate dl {\n  gap: 6px;\n  margin: 0;\n  display: grid;\n}\n\n.ZlutEW_setupEstimate dl > div {\n  grid-template-columns: 72px minmax(0, 1fr);\n  gap: 10px;\n  display: grid;\n}\n\n.ZlutEW_setupEstimate dt {\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.ZlutEW_setupEstimate dd {\n  margin: 0;\n}\n\n.ZlutEW_setupEstimate small {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n}\n\n.ZlutEW_deviceField {\n  min-width: 0;\n  display: block;\n  position: relative;\n}\n\n.ZlutEW_deviceField select {\n  width: 100%;\n}\n\n.ZlutEW_deviceField select.ZlutEW_deviceSelectMeter {\n  padding-right: 72px;\n}\n\n.ZlutEW_deviceMeter {\n  pointer-events: none;\n  display: inline-flex;\n  position: absolute;\n  top: 50%;\n  right: 24px;\n  transform: translateY(-50%);\n}\n\n.ZlutEW_deviceError {\n  min-width: 0;\n  color: var(--dsw-alias-state-error-primary);\n  overflow-wrap: anywhere;\n  grid-column: 2;\n  font-size: 12px;\n}\n\n.ZlutEW_inputLevel {\n  flex: none;\n  align-items: center;\n  gap: 3px;\n  display: inline-flex;\n}\n\n.ZlutEW_inputLevel > span {\n  background: var(--dsw-alias-border-l1);\n  border-radius: 1px;\n  width: 3px;\n  height: 12px;\n}\n\n.ZlutEW_inputLevel > span[data-active=\"true\"] {\n  background: var(--dsw-alias-state-success-primary);\n}\n\n@media (width <= 480px) {\n  .ZlutEW_deviceRow, .ZlutEW_preferences label, .ZlutEW_sourceChoice label {\n    grid-template-columns: minmax(0, 1fr);\n    gap: 6px;\n  }\n\n  .ZlutEW_deviceError {\n    grid-column: 1;\n  }\n}\n";
 Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 let react = require("react");
 let _deepseek_ai_dsh_client_store = require("@deepseek-ai/dsh-client-store");
@@ -12,9 +13,10 @@ let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-
 //#region \0voice-anywhere:build
 var _voice_anywhere_build_default = {
 	"official": "0.2.3-alpha.2",
-	"builtAt": "2026-11-26T22:17:00.752Z",
+	"officialHash": "3709d710fa82bc338d71d35774a45a86975a65b68408d512f4b0b1fd134136db",
+	"builtAt": "2026-11-27T02:00:36.116Z",
 	"engines": "^0.2.3-alpha.2",
-	"srcHash": "84f28de9baf424ee"
+	"srcHash": "cb4cea9537751828"
 };
 //#endregion
 //#region src/controls.ts
@@ -76,17 +78,50 @@ const composerControl = controlOver(() => document.querySelector(COMPOSER_CONTAI
 /** The microphone this plugin floats next to the focused field. */
 const floatingControl = controlOver(() => document.querySelector(FLOATING_ROOT));
 //#endregion
+//#region src/stale.ts
+let verdict = null;
+let blocked = false;
+/**
+* Store the current verdict.
+* @param next - the verdict to publish.
+*/
+function setVerdict(next) {
+	verdict = next;
+}
+/** @returns the current verdict, or null before the configuration arrives. */
+function verdictOf() {
+	return verdict;
+}
+/**
+* Record that the control failed to render, which means the copy is not merely
+* newer or older but incompatible.
+*/
+function markBlocked() {
+	blocked = true;
+}
+/** @returns whether the control had to be taken down. */
+function isBlocked() {
+	return blocked;
+}
+//#endregion
 //#region src/diagnostics.ts
+/**
+* The single writer of `window.__voiceAnywhere`.
+*
+* Every module that wants to leave a trace goes through here: one shape, one
+* retention bound, one place to look when a build misbehaves in the field.
+* Diagnostics never affect behaviour — a failed publish is swallowed on purpose.
+*/
 const MAX_EVENTS = 50;
 let facts = {};
 let events = [];
 /** Publish the current snapshot, ignoring a window that cannot hold it. */
 function publish() {
 	try {
-		window.__voiceAnywhere = {
+		window.__voiceAnywhere = withStale({
 			...facts,
 			events: [...events]
-		};
+		});
 	} catch {}
 }
 /**
@@ -124,6 +159,17 @@ function note(patch) {
 		...patch
 	};
 	publish();
+}
+/**
+* Attach the official-code verdict to the published surface.
+* @param value - current snapshot facts.
+* @returns the facts plus the stale state.
+*/
+function withStale(value) {
+	return {
+		...value,
+		stale: verdictOf()
+	};
 }
 //#endregion
 //#region src/selectors.ts
@@ -181,14 +227,39 @@ function setConfig(next) {
 */
 function normalizeConfig(raw) {
 	if (typeof raw !== "object" || raw === null) return DEFAULT_CONFIG;
+	const allow = Array.isArray(raw.allow) ? raw.allow.filter((entry) => typeof entry === "string" && entry.trim() !== "") : [];
+	const disable = Array.isArray(raw.disable) ? raw.disable.filter((entry) => typeof entry === "string" && TARGETS.has(entry)) : [];
+	const triggers = stringList(raw.triggers);
+	const submit = stringList(raw.submit);
+	const settingsPage = raw.settingsPage !== false;
+	const revision = typeof raw.revision === "string" ? raw.revision : "";
+	const profile = typeof raw.profile === "string" ? raw.profile : "";
+	const official = officialProbe(raw.official);
 	return {
-		allow: Array.isArray(raw.allow) ? raw.allow.filter((entry) => typeof entry === "string" && entry.trim() !== "") : [],
-		disable: Array.isArray(raw.disable) ? raw.disable.filter((entry) => typeof entry === "string" && TARGETS.has(entry)) : [],
-		triggers: stringList(raw.triggers),
-		submit: stringList(raw.submit),
-		settingsPage: raw.settingsPage !== false,
-		revision: typeof raw.revision === "string" ? raw.revision : "",
-		profile: typeof raw.profile === "string" ? raw.profile : ""
+		allow,
+		disable,
+		triggers,
+		submit,
+		settingsPage,
+		revision,
+		profile,
+		...official === void 0 ? {} : { official }
+	};
+}
+/**
+* Read the host's probe of the official package.
+* @param value - raw field value.
+* @returns the probe, or undefined when the host did not provide a usable one.
+*/
+function officialProbe(value) {
+	if (value === null || typeof value !== "object") return void 0;
+	const hash = value.hash;
+	const version = value.version;
+	const reason = value.reason;
+	return {
+		hash: typeof hash === "string" ? hash : null,
+		version: typeof version === "string" ? version : null,
+		reason: typeof reason === "string" ? reason : null
 	};
 }
 /**
@@ -649,6 +720,33 @@ function setCapturing(value) {
 	capturing = value;
 }
 //#endregion
+//#region src/guard.ts
+/**
+* Compare this build's vendored hash with the installed package's.
+* @param probe - host answer; absent when the configuration request failed.
+* @param built - hash this build was compiled against.
+* @returns the verdict.
+*/
+function evaluateOfficial(probe, built) {
+	if (probe === null || probe === void 0 || probe.hash === null) return {
+		state: "unknown",
+		built,
+		installed: null,
+		reason: probe?.reason ?? "configuration unavailable"
+	};
+	return probe.hash === built ? {
+		state: "match",
+		built,
+		installed: probe.hash,
+		reason: null
+	} : {
+		state: "mismatch",
+		built,
+		installed: probe.hash,
+		reason: null
+	};
+}
+//#endregion
 //#region src/face.ts
 /** The bundle whose detail page hosts the setup guidance. */
 const VOICE_BUNDLE = "@deepseek-ai/dsh-experimental-voice-input-bundle";
@@ -683,7 +781,7 @@ function createFace({ ctx, speech, recorder, navigation }) {
 	};
 }
 //#endregion
-//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/audio.ts
+//#region src/vendor/voice-input/audio.ts
 /** Browser-owned microphone capture and native Web Audio resampling. */
 /** Capture failure whose message is localized by the caller. */
 var RecordingError = class extends Error {
@@ -922,7 +1020,7 @@ var Recording = class {
 	}
 };
 //#endregion
-//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/failure-text.ts
+//#region src/vendor/voice-input/failure-text.ts
 /**
 * Translate a capture or transcription failure.
 * @param failure - the rejected value.
@@ -933,39 +1031,39 @@ function failureText(failure, t) {
 	return failure instanceof RecordingError ? t(failure.kind) : t("failed", { message: failure instanceof Error ? failure.message : String(failure) });
 }
 //#endregion
-//#region \0voice-anywhere-css:/home/yanhongbin/deepseek-harness/packages/experimental/client-ui-voice-input/src/client/VoiceInput.module.css?va-module
+//#region \0voice-anywhere-css:/home/yanhongbin/global-dsh-project/dsh-voice-anywhere/src/vendor/voice-input/VoiceInput.module.css?va-module
 var VoiceInput_module_default = {
-	"roundButton": "qU0WNq_roundButton",
-	"deviceRow": "qU0WNq_deviceRow",
-	"sourceChoice": "qU0WNq_sourceChoice",
-	"inlineAction": "qU0WNq_inlineAction",
-	"deviceField": "qU0WNq_deviceField",
-	"summaryRow": "qU0WNq_summaryRow",
-	"downloadFailure": "qU0WNq_downloadFailure",
-	"waveform": "qU0WNq_waveform",
-	"setupEstimate": "qU0WNq_setupEstimate",
-	"steps": "qU0WNq_steps",
-	"deviceSelectMeter": "qU0WNq_deviceSelectMeter",
-	"triggerAnchor": "qU0WNq_triggerAnchor",
-	"metric": "qU0WNq_metric",
-	"preparationError": "qU0WNq_preparationError",
-	"preparation": "qU0WNq_preparation",
-	"stepProgress": "qU0WNq_stepProgress",
-	"captureRow": "qU0WNq_captureRow",
-	"preferences": "qU0WNq_preferences",
-	"summaryTitle": "qU0WNq_summaryTitle",
-	"settingsCard": "qU0WNq_settingsCard",
-	"deviceMeter": "qU0WNq_deviceMeter",
-	"deviceError": "qU0WNq_deviceError",
-	"preparationActions": "qU0WNq_preparationActions",
-	"trigger": "qU0WNq_trigger",
-	"inputLevel": "qU0WNq_inputLevel",
-	"stepBody": "qU0WNq_stepBody",
-	"progress": "qU0WNq_progress",
-	"activityMessage": "qU0WNq_activityMessage"
+	"deviceRow": "ZlutEW_deviceRow",
+	"sourceChoice": "ZlutEW_sourceChoice",
+	"inlineAction": "ZlutEW_inlineAction",
+	"triggerAnchor": "ZlutEW_triggerAnchor",
+	"activityMessage": "ZlutEW_activityMessage",
+	"progress": "ZlutEW_progress",
+	"steps": "ZlutEW_steps",
+	"deviceMeter": "ZlutEW_deviceMeter",
+	"inputLevel": "ZlutEW_inputLevel",
+	"deviceError": "ZlutEW_deviceError",
+	"roundButton": "ZlutEW_roundButton",
+	"preparationActions": "ZlutEW_preparationActions",
+	"deviceSelectMeter": "ZlutEW_deviceSelectMeter",
+	"preparationError": "ZlutEW_preparationError",
+	"settingsCard": "ZlutEW_settingsCard",
+	"waveform": "ZlutEW_waveform",
+	"downloadFailure": "ZlutEW_downloadFailure",
+	"stepProgress": "ZlutEW_stepProgress",
+	"setupEstimate": "ZlutEW_setupEstimate",
+	"captureRow": "ZlutEW_captureRow",
+	"preparation": "ZlutEW_preparation",
+	"deviceField": "ZlutEW_deviceField",
+	"trigger": "ZlutEW_trigger",
+	"summaryRow": "ZlutEW_summaryRow",
+	"summaryTitle": "ZlutEW_summaryTitle",
+	"metric": "ZlutEW_metric",
+	"stepBody": "ZlutEW_stepBody",
+	"preferences": "ZlutEW_preferences"
 };
 //#endregion
-//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/Waveform.tsx
+//#region src/vendor/voice-input/Waveform.tsx
 /** Live microphone amplitude history; animation updates SVG geometry without React state churn. */
 /** Render recent measured microphone levels; silent audio remains a dotted baseline. */
 function Waveform({ recording, label }) {
@@ -1016,7 +1114,7 @@ function Waveform({ recording, label }) {
 	});
 }
 //#endregion
-//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/VoiceSetupDialog.tsx
+//#region src/vendor/voice-input/VoiceSetupDialog.tsx
 /** Shared modal for voice activation and unavailable recognition. */
 /**
 * Guide activation or microphone clicks to the existing plugin details.
@@ -1043,7 +1141,7 @@ function VoiceSetupDialog({ open, needsInstallation, onDismiss, onOpenDetails, t
 	});
 }
 //#endregion
-//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/VoiceInput.tsx
+//#region src/vendor/voice-input/VoiceInput.tsx
 /** Click-to-record toolbar activity; transcripts remain in the original Session draft. */
 async function disposeRecording(capture) {
 	try {
@@ -1290,6 +1388,48 @@ function VoiceInput({ sessionId, inputActions, locked, onActiveChange, createRec
 		]
 	});
 }
+//#endregion
+//#region src/vendor/voice-input/microphone-device.ts
+/** Browser-local microphone preference shared by settings previews and dictation. */
+/**
+* Restore the browser preference independently of Host recognition settings.
+* @returns validated device selection, persisted through the shared Client store.
+*/
+function createMicrophoneDeviceStore() {
+	const store = (0, _deepseek_ai_dsh_client_store.createSnapshotStore)({
+		id: "",
+		label: ""
+	}, { persist: { name: "dsh.voice-input.microphone" } });
+	const saved = store.getSnapshot();
+	if (!saved || typeof saved !== "object" || !("id" in saved) || typeof saved.id !== "string" || !("label" in saved) || typeof saved.label !== "string") store.set({
+		id: "",
+		label: ""
+	});
+	return store;
+}
+//#endregion
+//#region src/components/error-boundary.ts
+/**
+* Take the floating control down when the vendored UI cannot render.
+*
+* The only caller is the control itself: if the official component changed
+* shape, the plugin should lose its button, not the page its overlay.
+*/
+var ErrorBoundary = class extends react.Component {
+	constructor(props) {
+		super(props);
+		this.state = { failed: false };
+	}
+	static getDerivedStateFromError() {
+		return { failed: true };
+	}
+	componentDidCatch(error) {
+		this.props.onError(error);
+	}
+	render() {
+		return this.state.failed ? null : this.props.children;
+	}
+};
 //#endregion
 //#region src/placement.ts
 const BUTTON_SIZE = 30;
@@ -1610,6 +1750,34 @@ function FloatingMic(props) {
 	const { createRecording, transcribe, openSettings, prepare, cancelPreparation, configure, selectMicrophone, refreshReadiness, useSpeechReadiness, useMicrophoneDevice, usePluginNavigation, t } = props;
 	const { target, box, locked, setExpanded, rootRef } = useSurfaceControl(refreshReadiness);
 	if (target === null || box === null) return null;
+	const inputActions = {
+		captureInsertion: () => target.element.isConnected ? {
+			element: target.element,
+			kind: target.kind
+		} : null,
+		insertText: (text, span) => {
+			if (span !== null) return span.element.isConnected && insertText({
+				element: span.element,
+				kind: span.kind
+			}, text);
+			copyToClipboard(text);
+			return true;
+		}
+	};
+	const state = isBlocked() ? "broken" : verdictOf()?.state ?? "unknown";
+	const badge = state === "match" ? null : (0, react.createElement)("span", {
+		title: t(`badge.${state}`),
+		style: {
+			position: "absolute",
+			top: "-2px",
+			right: "-4px",
+			width: "6px",
+			height: "6px",
+			borderRadius: "50%",
+			background: state === "unknown" ? "#ffbb00" : "#e5484d",
+			pointerEvents: "none"
+		}
+	});
 	return (0, react_dom.createPortal)((0, react.createElement)("div", {
 		"data-voice-anywhere-root": "",
 		ref: rootRef,
@@ -1625,6 +1793,12 @@ function FloatingMic(props) {
 			zIndex: 1050,
 			pointerEvents: "none"
 		}
+	}, [(0, react.createElement)(ErrorBoundary, {
+		key: "control",
+		onError: (error) => {
+			markBlocked();
+			report("render", error);
+		}
 	}, (0, react.createElement)("div", { style: {
 		pointerEvents: "auto",
 		width: "100%",
@@ -1634,20 +1808,7 @@ function FloatingMic(props) {
 		boxSizing: "border-box"
 	} }, (0, react.createElement)(VoiceInput, {
 		sessionId: FIXED_SESSION,
-		inputActions: {
-			captureInsertion: () => target.element.isConnected ? {
-				element: target.element,
-				kind: target.kind
-			} : null,
-			insertText: (text, span) => {
-				if (span !== null) return span.element.isConnected && insertText({
-					element: span.element,
-					kind: span.kind
-				}, text);
-				copyToClipboard(text);
-				return true;
-			}
-		},
+		inputActions,
 		locked,
 		onActiveChange: setExpanded,
 		createRecording,
@@ -1661,10 +1822,10 @@ function FloatingMic(props) {
 		useMicrophoneDevice,
 		usePluginNavigation,
 		t
-	}))), document.body);
+	}))), badge]), document.body);
 }
 //#endregion
-//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/locales.ts
+//#region src/vendor/voice-input/locales.ts
 /** Chinese dictionary and key source. */
 const zh = {
 	dictate: "听写",
@@ -2637,7 +2798,13 @@ const SETTINGS_TEXT = {
 		"settings.captured": "已添加：",
 		"settings.rejected": "这个组合无法用作触发键：",
 		"settings.remove": "删除",
-		"settings.close": "关闭此设置页"
+		"settings.close": "隐藏此设置页",
+		"settings.stale": "官方语音组件已更新：构建 {built}，当前 {installed}。当前仍在使用旧副本，建议更新插件。",
+		"settings.staleUnknown": "无法核对官方语音组件版本（{reason}），当前按原样运行。",
+		"settings.staleBroken": "官方组件与当前副本不兼容，浮动麦克风已停用，请更新插件。",
+		"badge.mismatch": "官方语音组件已更新，建议更新插件",
+		"badge.unknown": "无法核对官方语音组件版本",
+		"badge.broken": "官方组件与当前副本不兼容，浮动麦克风已停用"
 	},
 	en: {
 		"settings.label": "Voice input",
@@ -2652,9 +2819,24 @@ const SETTINGS_TEXT = {
 		"settings.captured": "Added:",
 		"settings.rejected": "That combination cannot be a trigger:",
 		"settings.remove": "Remove",
-		"settings.close": "Close this page"
+		"settings.close": "Hide this page",
+		"settings.stale": "The official voice UI changed: built {built}, installed {installed}. This copy still runs; update the plugin when you can.",
+		"settings.staleUnknown": "Could not verify the official voice UI ({reason}); running this copy as-is.",
+		"settings.staleBroken": "The official UI and this copy disagree; the floating microphone is disabled. Please update the plugin.",
+		"badge.mismatch": "The official voice UI changed; consider updating the plugin",
+		"badge.unknown": "Could not verify the official voice UI",
+		"badge.broken": "Incompatible with the official UI; the floating microphone is disabled"
 	}
 };
+/**
+* Substitute `{name}` placeholders in one message.
+* @param template - localized text.
+* @param values - replacement values by placeholder name.
+* @returns the filled text.
+*/
+function format(template, values) {
+	return template.replace(/\{(\w+)\}/gu, (match, key) => values[key] ?? match);
+}
 /** Locale dictionaries installed for every shipped language. */
 const DICTS = {
 	zh: {
@@ -2698,25 +2880,6 @@ const DICTS = {
 		...SETTINGS_TEXT.en
 	}
 };
-//#endregion
-//#region ../../deepseek-harness/packages/experimental/client-ui-voice-input/src/client/microphone-device.ts
-/** Browser-local microphone preference shared by settings previews and dictation. */
-/**
-* Restore the browser preference independently of Host recognition settings.
-* @returns validated device selection, persisted through the shared Client store.
-*/
-function createMicrophoneDeviceStore() {
-	const store = (0, _deepseek_ai_dsh_client_store.createSnapshotStore)({
-		id: "",
-		label: ""
-	}, { persist: { name: "dsh.voice-input.microphone" } });
-	const saved = store.getSnapshot();
-	if (!saved || typeof saved !== "object" || !("id" in saved) || typeof saved.id !== "string" || !("label" in saved) || typeof saved.label !== "string") store.set({
-		id: "",
-		label: ""
-	});
-	return store;
-}
 //#endregion
 //#region src/recording.ts
 /**
@@ -3045,6 +3208,72 @@ function expressionOf(event) {
 	return parseTrigger(expression) === null ? null : expression;
 }
 //#endregion
+//#region src/components/notice.ts
+/**
+* One line of status the user must see (not a toast: it stays until the state
+* it describes changes).
+*/
+const TONE = {
+	warn: {
+		color: "#7a4b00",
+		background: "rgba(255, 187, 0, 0.12)"
+	},
+	danger: {
+		color: "#8b1d1d",
+		background: "rgba(229, 72, 77, 0.12)"
+	},
+	muted: {
+		color: "inherit",
+		background: "rgba(128, 128, 128, 0.12)"
+	}
+};
+/**
+* Render the notice.
+* @param props - tone and text.
+* @returns the notice element.
+*/
+function Notice(props) {
+	const tone = TONE[props.tone];
+	return (0, react.createElement)("p", {
+		role: "status",
+		style: {
+			margin: 0,
+			padding: "8px 10px",
+			borderRadius: "8px",
+			fontSize: "12px",
+			lineHeight: 1.5,
+			color: tone.color,
+			background: tone.background
+		}
+	}, props.text);
+}
+//#endregion
+//#region src/settings/stale-notice.ts
+/**
+* Describe the official-code state, when it is worth mentioning.
+* @param t - translator bound to this plugin's namespace.
+* @returns tone and text, or null when the copy matches.
+*/
+function staleNotice(t) {
+	if (isBlocked()) return {
+		tone: "danger",
+		text: t("settings.staleBroken")
+	};
+	const verdict = verdictOf();
+	if (verdict === null || verdict.state === "match") return null;
+	if (verdict.state === "unknown") return {
+		tone: "warn",
+		text: format(t("settings.staleUnknown"), { reason: verdict.reason ?? "unknown" })
+	};
+	return {
+		tone: "danger",
+		text: format(t("settings.stale"), {
+			built: verdict.built.slice(0, 8),
+			installed: verdict.installed?.slice(0, 8) ?? "?"
+		})
+	};
+}
+//#endregion
 //#region src/settings/styles.ts
 /**
 * Inline spacing for the settings page.
@@ -3175,7 +3404,8 @@ function SettingsSection(props) {
 		closePage(config.revision, profile ?? config.profile);
 		onClose?.();
 	};
-	return (0, react.createElement)("div", { style: STYLE.page }, (0, react.createElement)("p", { style: STYLE.hint }, t("settings.hint")), (0, react.createElement)(TriggerColumn, {
+	const notice = staleNotice(t);
+	return (0, react.createElement)("div", { style: STYLE.page }, notice === null ? null : (0, react.createElement)(Notice, notice), (0, react.createElement)("p", { style: STYLE.hint }, t("settings.hint")), (0, react.createElement)(TriggerColumn, {
 		t,
 		title: t("settings.voice"),
 		hint: t("settings.voiceHint"),
@@ -3690,6 +3920,10 @@ function apply(ctx) {
 			let section = null;
 			let cancelled = false;
 			loadConfig().then((config) => {
+				const official = evaluateOfficial(config.official, _voice_anywhere_build_default.officialHash);
+				setVerdict(official);
+				if (official.state === "mismatch") console.warn(`[voice-anywhere] 官方语音组件已更新（构建 ${official.built.slice(0, 8)} · 当前 ${official.installed?.slice(0, 8)}），当前仍在使用旧副本，建议更新插件。`);
+				note({ official });
 				if (cancelled || !config.settingsPage || isPageClosed(config.revision, config.profile)) return;
 				section = ctx.slots.inject("settings.section", () => ctx.slots.register({
 					name: "settings.section",
@@ -3720,7 +3954,6 @@ function apply(ctx) {
 exports.apply = apply;
 exports.inject = inject;
 
-    const VOICE_ANYWHERE_CSS = ".qU0WNq_trigger {\n  flex: none;\n  width: 28px;\n  padding: 0;\n}\n\n.qU0WNq_triggerAnchor {\n  flex: none;\n  display: inline-flex;\n}\n\n.qU0WNq_captureRow {\n  align-items: center;\n  gap: 12px;\n  width: 100%;\n  min-width: 0;\n  min-height: 34px;\n  display: flex;\n}\n\n.qU0WNq_roundButton {\n  corner-shape: round;\n  background: var(--dsw-specific-selector);\n  border-radius: 50%;\n  flex: none;\n  width: 32px;\n  height: 32px;\n  padding: 0;\n}\n\n@media (hover: hover) {\n  .qU0WNq_roundButton:hover:not(:disabled) {\n    background: var(--dsw-alias-interactive-bg-hover-solid);\n  }\n}\n\n.qU0WNq_waveform {\n  width: 0;\n  min-width: 24px;\n  height: 24px;\n  color: var(--dsw-alias-label-secondary);\n  flex: 1;\n  display: block;\n}\n\n.qU0WNq_activityMessage {\n  min-width: 0;\n  color: var(--dsw-alias-label-secondary);\n  white-space: nowrap;\n  text-overflow: ellipsis;\n  flex: 1;\n  align-items: center;\n  gap: 8px;\n  font-size: 12px;\n  display: flex;\n  overflow: hidden;\n}\n\n.qU0WNq_inlineAction {\n  flex: none;\n}\n\n.qU0WNq_preparation {\n  border: .5px solid var(--dsw-alias-border-l1);\n  border-radius: 10px;\n  flex-direction: column;\n  gap: 10px;\n  margin: 12px 0;\n  padding: 14px;\n  font-size: 13px;\n  display: flex;\n}\n\n.qU0WNq_preparation p {\n  margin: 0;\n}\n\n.qU0WNq_preparationActions {\n  gap: 8px;\n  display: flex;\n}\n\n.qU0WNq_preparationActions:empty {\n  display: none;\n}\n\n.qU0WNq_preparationError {\n  color: var(--dsw-alias-state-error-primary);\n  overflow-wrap: anywhere;\n  font-size: 12px;\n}\n\n.qU0WNq_downloadFailure {\n  overflow-wrap: anywhere;\n  gap: 6px;\n  display: grid;\n}\n\n.qU0WNq_summaryRow {\n  flex-wrap: wrap;\n  gap: 4px;\n  height: auto;\n  min-height: 28px;\n}\n\n.qU0WNq_summaryTitle {\n  flex: 1;\n  min-width: 0;\n}\n\n.qU0WNq_metric {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n}\n\n.qU0WNq_progress {\n  width: 100%;\n  height: 6px;\n  accent-color: var(--dsw-alias-state-business-primary);\n}\n\n.qU0WNq_steps {\n  flex-direction: column;\n  gap: 14px;\n  margin: 0;\n  padding: 16px 0 2px;\n  list-style: none;\n  display: flex;\n}\n\n.qU0WNq_steps li {\n  align-items: flex-start;\n  gap: 10px;\n  line-height: 18px;\n  display: flex;\n}\n\n.qU0WNq_steps li > :first-child {\n  margin-top: 1px;\n}\n\n.qU0WNq_steps li[data-step-state=\"pending\"] {\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.qU0WNq_stepBody {\n  flex: 1;\n  min-width: 0;\n}\n\n.qU0WNq_stepProgress {\n  flex-direction: column;\n  gap: 6px;\n  margin-top: 6px;\n  display: flex;\n}\n\n.qU0WNq_stepProgress small {\n  color: var(--dsw-alias-label-tertiary);\n  overflow-wrap: anywhere;\n  font-size: 11px;\n}\n\n.qU0WNq_preferences {\n  gap: 12px;\n  margin: 18px 0;\n  font-size: 13px;\n  display: grid;\n}\n\n.qU0WNq_deviceRow, .qU0WNq_preferences label, .qU0WNq_sourceChoice label {\n  grid-template-columns: 100px minmax(120px, 280px);\n  align-items: center;\n  gap: 12px;\n  display: grid;\n}\n\n.qU0WNq_preferences select, .qU0WNq_sourceChoice select {\n  border: .5px solid var(--dsw-alias-border-l1);\n  color: inherit;\n  font: inherit;\n  background: none;\n  border-radius: 6px;\n  padding: 6px 10px;\n}\n\n.qU0WNq_sourceChoice {\n  gap: 6px;\n  display: grid;\n}\n\n.qU0WNq_preferences p {\n  margin: 0;\n}\n\n.qU0WNq_settingsCard {\n  border: .5px solid var(--dsw-alias-border-l1);\n  border-radius: 10px;\n  padding: 16px;\n  list-style: none;\n}\n\n.qU0WNq_settingsCard > p {\n  color: var(--dsw-alias-label-secondary);\n  margin: 8px 0 0;\n  font-size: 13px;\n}\n\n.qU0WNq_setupEstimate {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-secondary);\n  border-radius: 8px;\n  gap: 10px;\n  padding: 12px;\n  line-height: 1.6;\n  display: grid;\n}\n\n.qU0WNq_setupEstimate dl {\n  gap: 6px;\n  margin: 0;\n  display: grid;\n}\n\n.qU0WNq_setupEstimate dl > div {\n  grid-template-columns: 72px minmax(0, 1fr);\n  gap: 10px;\n  display: grid;\n}\n\n.qU0WNq_setupEstimate dt {\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.qU0WNq_setupEstimate dd {\n  margin: 0;\n}\n\n.qU0WNq_setupEstimate small {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n}\n\n.qU0WNq_deviceField {\n  min-width: 0;\n  display: block;\n  position: relative;\n}\n\n.qU0WNq_deviceField select {\n  width: 100%;\n}\n\n.qU0WNq_deviceField select.qU0WNq_deviceSelectMeter {\n  padding-right: 72px;\n}\n\n.qU0WNq_deviceMeter {\n  pointer-events: none;\n  display: inline-flex;\n  position: absolute;\n  top: 50%;\n  right: 24px;\n  transform: translateY(-50%);\n}\n\n.qU0WNq_deviceError {\n  min-width: 0;\n  color: var(--dsw-alias-state-error-primary);\n  overflow-wrap: anywhere;\n  grid-column: 2;\n  font-size: 12px;\n}\n\n.qU0WNq_inputLevel {\n  flex: none;\n  align-items: center;\n  gap: 3px;\n  display: inline-flex;\n}\n\n.qU0WNq_inputLevel > span {\n  background: var(--dsw-alias-border-l1);\n  border-radius: 1px;\n  width: 3px;\n  height: 12px;\n}\n\n.qU0WNq_inputLevel > span[data-active=\"true\"] {\n  background: var(--dsw-alias-state-success-primary);\n}\n\n@media (width <= 480px) {\n  .qU0WNq_deviceRow, .qU0WNq_preferences label, .qU0WNq_sourceChoice label {\n    grid-template-columns: minmax(0, 1fr);\n    gap: 6px;\n  }\n\n  .qU0WNq_deviceError {\n    grid-column: 1;\n  }\n}\n";
     return module.exports;
   },
 });
