@@ -42,7 +42,7 @@
   "devDependencies": {
     "typescript": "5.9"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/744855705/dsh-voice-anywhere.git"

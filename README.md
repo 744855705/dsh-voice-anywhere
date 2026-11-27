@@ -176,3 +176,9 @@ npm run build         # 重新产出 client.js
 | `src/trigger/expression.ts` | 触发器表达式的解析与匹配（纯函数） |
 | `src/trigger/engine.ts` | 捕获阶段的键盘/鼠标监听 |
 | `src/targets.ts`、`src/controls.ts`、`src/speech.ts`、`src/recording.ts` | 输入框识别与写入、控件状态契约、语音服务、录音 |
+
+## 许可证
+
+本项目以 **Apache License 2.0** 授权，全文见 [LICENSE](LICENSE)。
+
+`src/vendor/voice-input/` 是 DSH 官方语音组件（`@deepseek-ai/dsh-experimental-client-ui-voice-input`）的逐字复制件，仍按上游的 **MIT** 许可使用；许可原文保留在 `src/vendor/voice-input/LICENSE`，归属说明见 [NOTICE](NOTICE)。

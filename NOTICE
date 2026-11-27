@@ -1,0 +1,15 @@
+dsh-voice-anywhere
+Copyright 2026 744855705
+
+This product is licensed under the Apache License, Version 2.0.
+
+It includes the following third-party material:
+
+  src/vendor/voice-input
+    Copied from @deepseek-ai/dsh-experimental-client-ui-voice-input
+    (DeepSeek Harness), licensed under the MIT License.
+    The original license text is kept in src/vendor/voice-input/LICENSE.
+
+The vendored copy is unmodified apart from a leading `@ts-nocheck` comment
+and, for the vendored component, the import paths recorded in
+src/vendor/voice-input/PROVENANCE.json.
