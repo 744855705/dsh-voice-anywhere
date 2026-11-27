@@ -7,8 +7,11 @@
  * selectors here means the composer's markup is known in one place only.
  */
 
-/** Idle microphone, active capture, or a state that accepts no press. */
-export type ControlState = 'none' | 'idle' | 'recording' | 'busy'
+/**
+ * Idle microphone, active capture, a finished capture awaiting dismissal, or a state that
+ * accepts no press.
+ */
+export type ControlState = 'none' | 'idle' | 'recording' | 'feedback' | 'busy'
 
 export interface VoiceControl {
   /** @returns the container's phase, or `none` when it is not rendered. */
@@ -35,7 +38,12 @@ function stateOf(container: HTMLElement | null): ControlState {
   if (container === null) return 'none'
   const row = container.querySelector(ACTIVITY)
   if (row === null) return container.querySelector('button') === null ? 'none' : 'idle'
-  return row.getAttribute('data-voice-activity') === 'recording' ? 'recording' : 'busy'
+  const phase = row.getAttribute('data-voice-activity')
+  if (phase === 'recording') return 'recording'
+  // A finished capture stays on screen until something dismisses it, and its only keyboard exit
+  // is this press: without it the row keeps the composer unmounted and every shortcut dead.
+  if (phase === 'feedback') return 'feedback'
+  return 'busy'
 }
 
 /**
@@ -61,6 +69,8 @@ function controlOver(find: () => HTMLElement | null): VoiceControl {
     const container = find()
     const phase = stateOf(container)
     if (container === null || phase === 'none' || phase === 'busy') return false
+    // Dismissing a finished capture never touches the microphone, so it is always allowed.
+    if (phase === 'feedback') return true
     // A second capture must never start while another entry is recording.
     return phase === 'recording' || !hasForeignRecording(container)
   }
@@ -74,8 +84,10 @@ function controlOver(find: () => HTMLElement | null): VoiceControl {
       const row = container.querySelector(ACTIVITY)
       const buttons = (row ?? container).querySelectorAll('button')
       if (buttons.length === 0) return false
-      // The official row leads with cancel and ends with stop; idle has one trigger.
-      const button = stateOf(container) === 'recording' ? buttons[buttons.length - 1] : buttons[0]
+      // The official row leads with cancel and ends with stop; idle has one trigger, and a
+      // finished capture is dismissed by that same leading cancel button.
+      const phase = stateOf(container)
+      const button = phase === 'recording' ? buttons[buttons.length - 1] : buttons[0]
       ;(button as HTMLButtonElement).click()
       return true
     },

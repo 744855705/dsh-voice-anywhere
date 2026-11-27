@@ -14,9 +14,9 @@ let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-
 var _voice_anywhere_build_default = {
 	"official": "0.2.3-alpha.2",
 	"officialHash": "3709d710fa82bc338d71d35774a45a86975a65b68408d512f4b0b1fd134136db",
-	"builtAt": "2026-11-27T08:55:22.763Z",
+	"builtAt": "2026-11-27T09:20:47.498Z",
 	"engines": ">=0.2.2-rc.1 <=0.5.0",
-	"srcHash": "6eb3c1db8d738f05"
+	"srcHash": "0846624b01c22ac0"
 };
 //#endregion
 //#region src/controls.ts
@@ -35,7 +35,10 @@ function stateOf(container) {
 	if (container === null) return "none";
 	const row = container.querySelector(ACTIVITY);
 	if (row === null) return container.querySelector("button") === null ? "none" : "idle";
-	return row.getAttribute("data-voice-activity") === "recording" ? "recording" : "busy";
+	const phase = row.getAttribute("data-voice-activity");
+	if (phase === "recording") return "recording";
+	if (phase === "feedback") return "feedback";
+	return "busy";
 }
 /**
 * Detect a capture already running somewhere other than `container`.
@@ -57,6 +60,7 @@ function controlOver(find) {
 		const container = find();
 		const phase = stateOf(container);
 		if (container === null || phase === "none" || phase === "busy") return false;
+		if (phase === "feedback") return true;
 		return phase === "recording" || !hasForeignRecording(container);
 	};
 	return {
@@ -613,6 +617,24 @@ function planActivation(target) {
 			floatingControl.press();
 		};
 	}
+	if (composerState === "feedback") {
+		note({
+			...states,
+			branch: "composer-feedback"
+		});
+		return () => {
+			composerControl.press();
+		};
+	}
+	if (floatingState === "feedback") {
+		note({
+			...states,
+			branch: "floating-feedback"
+		});
+		return () => {
+			floatingControl.press();
+		};
+	}
 	if (inComposer && composerState === "idle") {
 		note({
 			...states,
@@ -1076,34 +1098,34 @@ function failureText(failure, t) {
 //#endregion
 //#region \0voice-anywhere-css:/home/yanhongbin/global-dsh-project/dsh-voice-anywhere/src/vendor/voice-input/VoiceInput.module.css?va-module
 var VoiceInput_module_default = {
-	"deviceRow": "ZlutEW_deviceRow",
-	"settingsCard": "ZlutEW_settingsCard",
-	"activityMessage": "ZlutEW_activityMessage",
-	"deviceSelectMeter": "ZlutEW_deviceSelectMeter",
-	"inputLevel": "ZlutEW_inputLevel",
-	"waveform": "ZlutEW_waveform",
-	"deviceField": "ZlutEW_deviceField",
-	"summaryRow": "ZlutEW_summaryRow",
-	"trigger": "ZlutEW_trigger",
-	"roundButton": "ZlutEW_roundButton",
-	"progress": "ZlutEW_progress",
-	"summaryTitle": "ZlutEW_summaryTitle",
-	"preparationActions": "ZlutEW_preparationActions",
-	"preparationError": "ZlutEW_preparationError",
-	"stepBody": "ZlutEW_stepBody",
-	"deviceError": "ZlutEW_deviceError",
-	"preparation": "ZlutEW_preparation",
-	"steps": "ZlutEW_steps",
-	"setupEstimate": "ZlutEW_setupEstimate",
-	"triggerAnchor": "ZlutEW_triggerAnchor",
-	"captureRow": "ZlutEW_captureRow",
-	"deviceMeter": "ZlutEW_deviceMeter",
-	"stepProgress": "ZlutEW_stepProgress",
-	"downloadFailure": "ZlutEW_downloadFailure",
-	"preferences": "ZlutEW_preferences",
 	"metric": "ZlutEW_metric",
+	"preparation": "ZlutEW_preparation",
+	"summaryRow": "ZlutEW_summaryRow",
+	"deviceField": "ZlutEW_deviceField",
+	"deviceError": "ZlutEW_deviceError",
+	"inputLevel": "ZlutEW_inputLevel",
+	"trigger": "ZlutEW_trigger",
+	"captureRow": "ZlutEW_captureRow",
+	"stepProgress": "ZlutEW_stepProgress",
+	"deviceRow": "ZlutEW_deviceRow",
+	"setupEstimate": "ZlutEW_setupEstimate",
+	"sourceChoice": "ZlutEW_sourceChoice",
+	"deviceMeter": "ZlutEW_deviceMeter",
+	"stepBody": "ZlutEW_stepBody",
+	"preparationActions": "ZlutEW_preparationActions",
+	"triggerAnchor": "ZlutEW_triggerAnchor",
 	"inlineAction": "ZlutEW_inlineAction",
-	"sourceChoice": "ZlutEW_sourceChoice"
+	"roundButton": "ZlutEW_roundButton",
+	"waveform": "ZlutEW_waveform",
+	"summaryTitle": "ZlutEW_summaryTitle",
+	"activityMessage": "ZlutEW_activityMessage",
+	"preparationError": "ZlutEW_preparationError",
+	"downloadFailure": "ZlutEW_downloadFailure",
+	"progress": "ZlutEW_progress",
+	"steps": "ZlutEW_steps",
+	"preferences": "ZlutEW_preferences",
+	"settingsCard": "ZlutEW_settingsCard",
+	"deviceSelectMeter": "ZlutEW_deviceSelectMeter"
 };
 //#endregion
 //#region src/vendor/voice-input/Waveform.tsx

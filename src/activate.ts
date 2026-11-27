@@ -56,6 +56,11 @@ export function planActivation(target?: Element | null): (() => void) | null {
   // moving focus mid-recording would leave the key unable to stop it.
   if (composerState === 'recording') { note({ ...states, branch: 'composer-recording' }); return () => { composerControl.press() } }
   if (floatingState === 'recording') { note({ ...states, branch: 'floating-recording' }); return () => { floatingControl.press() } }
+  // A finished capture keeps the composer unmounted until it is dismissed, so
+  // this press is the only keyboard way back to a usable editor. It is keyed on
+  // the surface, not the focus, for the same reason recording is.
+  if (composerState === 'feedback') { note({ ...states, branch: 'composer-feedback' }); return () => { composerControl.press() } }
+  if (floatingState === 'feedback') { note({ ...states, branch: 'floating-feedback' }); return () => { floatingControl.press() } }
   if (inComposer && composerState === 'idle') { note({ ...states, branch: 'composer-idle' }); return () => { composerControl.press() } }
   if (!inComposer && floatingState === 'idle') { note({ ...states, branch: 'floating-idle' }); return () => { floatingControl.press() } }
 
