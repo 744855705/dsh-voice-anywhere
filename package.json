@@ -11,6 +11,7 @@
     "./icon": "./icon.svg"
   },
   "files": [
+    "NOTICE",
     "README.md",
     "index.js",
     "host",
