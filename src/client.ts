@@ -141,13 +141,20 @@ export function apply(ctx: any): void {
       voiceTriggers = parseTriggers(loadTriggerText(currentConfig().triggers))
       submitTriggers = parseTriggers(loadSubmitText(currentConfig().submit))
     }
+    // `storage` only fires in other tabs; the settings page also announces its
+    // own saves so a recorded trigger works without a reload.
     window.addEventListener('storage', refreshTriggers)
+    window.addEventListener('voice-anywhere:triggers', refreshTriggers)
     ctx.effect(() => {
       const stop = startTriggers([
         { triggers: () => (isCapturing() ? [] : voiceTriggers), fire: () => { planActivation()?.() } },
         { triggers: () => (isCapturing() ? [] : submitTriggers), fire: () => { planSubmit()?.() } },
       ])
-      return () => { stop(); window.removeEventListener('storage', refreshTriggers) }
+      return () => {
+        stop()
+        window.removeEventListener('storage', refreshTriggers)
+        window.removeEventListener('voice-anywhere:triggers', refreshTriggers)
+      }
     })
 
     // The policy is deny-by-default; a failed load keeps every plain field off.

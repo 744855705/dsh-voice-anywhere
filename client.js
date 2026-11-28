@@ -14,9 +14,9 @@ let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-
 var _voice_anywhere_build_default = {
 	"official": "0.2.3-alpha.2",
 	"officialHash": "3709d710fa82bc338d71d35774a45a86975a65b68408d512f4b0b1fd134136db",
-	"builtAt": "2026-11-27T14:49:45.995Z",
+	"builtAt": "2026-11-28T07:23:36.769Z",
 	"engines": ">=0.2.2-rc.1 <=0.5.0",
-	"srcHash": "26ed19e4521458c1"
+	"srcHash": "2753e2a715fe5ef6"
 };
 //#endregion
 //#region src/controls.ts
@@ -1099,34 +1099,34 @@ function failureText(failure, t) {
 //#endregion
 //#region \0voice-anywhere-css:/home/yanhongbin/global-dsh-project/dsh-voice-anywhere/src/vendor/voice-input/VoiceInput.module.css?va-module
 var VoiceInput_module_default = {
+	"sourceChoice": "ZlutEW_sourceChoice",
+	"deviceMeter": "ZlutEW_deviceMeter",
+	"trigger": "ZlutEW_trigger",
+	"deviceError": "ZlutEW_deviceError",
+	"waveform": "ZlutEW_waveform",
+	"summaryRow": "ZlutEW_summaryRow",
+	"stepProgress": "ZlutEW_stepProgress",
 	"triggerAnchor": "ZlutEW_triggerAnchor",
 	"inlineAction": "ZlutEW_inlineAction",
-	"trigger": "ZlutEW_trigger",
 	"deviceRow": "ZlutEW_deviceRow",
-	"activityMessage": "ZlutEW_activityMessage",
-	"setupEstimate": "ZlutEW_setupEstimate",
 	"captureRow": "ZlutEW_captureRow",
-	"metric": "ZlutEW_metric",
-	"deviceField": "ZlutEW_deviceField",
-	"inputLevel": "ZlutEW_inputLevel",
-	"preparationActions": "ZlutEW_preparationActions",
-	"waveform": "ZlutEW_waveform",
-	"summaryTitle": "ZlutEW_summaryTitle",
-	"deviceMeter": "ZlutEW_deviceMeter",
 	"steps": "ZlutEW_steps",
 	"settingsCard": "ZlutEW_settingsCard",
-	"roundButton": "ZlutEW_roundButton",
-	"downloadFailure": "ZlutEW_downloadFailure",
-	"sourceChoice": "ZlutEW_sourceChoice",
+	"setupEstimate": "ZlutEW_setupEstimate",
+	"metric": "ZlutEW_metric",
 	"preferences": "ZlutEW_preferences",
-	"preparationError": "ZlutEW_preparationError",
-	"summaryRow": "ZlutEW_summaryRow",
-	"progress": "ZlutEW_progress",
-	"stepBody": "ZlutEW_stepBody",
-	"stepProgress": "ZlutEW_stepProgress",
 	"deviceSelectMeter": "ZlutEW_deviceSelectMeter",
-	"deviceError": "ZlutEW_deviceError",
-	"preparation": "ZlutEW_preparation"
+	"deviceField": "ZlutEW_deviceField",
+	"inputLevel": "ZlutEW_inputLevel",
+	"roundButton": "ZlutEW_roundButton",
+	"stepBody": "ZlutEW_stepBody",
+	"preparationError": "ZlutEW_preparationError",
+	"summaryTitle": "ZlutEW_summaryTitle",
+	"preparation": "ZlutEW_preparation",
+	"activityMessage": "ZlutEW_activityMessage",
+	"downloadFailure": "ZlutEW_downloadFailure",
+	"progress": "ZlutEW_progress",
+	"preparationActions": "ZlutEW_preparationActions"
 };
 //#endregion
 //#region src/vendor/voice-input/Waveform.tsx
@@ -3412,6 +3412,16 @@ const STYLE = {
 * single place that decides where dictation may happen, so this page can never
 * become a second, silently divergent policy editor.
 */
+/** Same-tab signal: `storage` only reaches other tabs, so the engine needs this. */
+const TRIGGERS_CHANGED = "voice-anywhere:triggers";
+/**
+* Tell the running engine that a list changed.
+*/
+function announceChange() {
+	try {
+		window.dispatchEvent(new Event(TRIGGERS_CHANGED));
+	} catch {}
+}
 /**
 * Render one editable trigger list.
 * @param props - translator, copy, values and the three callbacks.
@@ -3457,10 +3467,12 @@ function SettingsSection(props) {
 				const next = [...voice.filter((entry) => entry !== expression), expression];
 				setVoice(next);
 				saveTriggerText(next);
+				announceChange();
 			} else {
 				const next = [...submit.filter((entry) => entry !== expression), expression];
 				setSubmit(next);
 				saveSubmitText(next);
+				announceChange();
 			}
 			setMessage(`${t("settings.captured")} ${expression}`);
 			setCapturing$1(null);
@@ -3483,10 +3495,12 @@ function SettingsSection(props) {
 			const next = voice.filter((entry) => entry !== value);
 			setVoice(next);
 			saveTriggerText(next);
+			announceChange();
 		} else {
 			const next = submit.filter((entry) => entry !== value);
 			setSubmit(next);
 			saveSubmitText(next);
+			announceChange();
 		}
 	};
 	const toggle = (column) => {
@@ -3789,6 +3803,22 @@ function registerShortcut(ctx, t, report) {
 */
 function startTriggers(bindings) {
 	/**
+	* Record a side-button event.
+	*
+	* Browsers deliver these as `mousedown` with button 3/4, but a desktop shell
+	* may consume them first; without a trace there is no way to tell "nothing
+	* arrived" from "it arrived and did not match".
+	* @param type - the event type that was seen.
+	* @param event - the mouse event.
+	*/
+	const observeSideButton = (type, event) => {
+		if (event.button !== 3 && event.button !== 4) return;
+		note({ sideButton: {
+			type,
+			button: event.button
+		} });
+	};
+	/**
 	* Dispatch one event to the first matching binding.
 	* @param event - the captured event.
 	* @param matches - matcher for this event kind.
@@ -3810,9 +3840,11 @@ function startTriggers(bindings) {
 		dispatch(event, (trigger) => matchesKey(trigger, event));
 	};
 	const onMouseDown = (event) => {
+		observeSideButton("mousedown", event);
 		dispatch(event, (trigger) => matchesMouse(trigger, event));
 	};
 	const onAuxClick = (event) => {
+		observeSideButton("auxclick", event);
 		for (const binding of bindings) {
 			if (!binding.triggers().some((trigger) => matchesMouse(trigger, event))) continue;
 			event.preventDefault();
@@ -4017,6 +4049,7 @@ function apply(ctx) {
 			submitTriggers = parseTriggers(loadSubmitText(currentConfig().submit));
 		};
 		window.addEventListener("storage", refreshTriggers);
+		window.addEventListener("voice-anywhere:triggers", refreshTriggers);
 		ctx.effect(() => {
 			const stop = startTriggers([{
 				triggers: () => isCapturing() ? [] : voiceTriggers,
@@ -4032,6 +4065,7 @@ function apply(ctx) {
 			return () => {
 				stop();
 				window.removeEventListener("storage", refreshTriggers);
+				window.removeEventListener("voice-anywhere:triggers", refreshTriggers);
 			};
 		});
 		ctx.effect(() => {

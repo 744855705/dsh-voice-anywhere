@@ -2,6 +2,7 @@
  * The trigger engine: the one place that subscribes to keyboard and mouse
  * events, and hands a match to the shared activation.
  */
+import { note } from '../diagnostics.ts'
 import { matchesKey, matchesMouse, type Trigger } from './expression.ts'
 
 /** One set of triggers and the action a match runs. */
@@ -21,6 +22,20 @@ export interface TriggerBinding {
  * @returns the removal function.
  */
 export function startTriggers(bindings: readonly TriggerBinding[]): () => void {
+  /**
+   * Record a side-button event.
+   *
+   * Browsers deliver these as `mousedown` with button 3/4, but a desktop shell
+   * may consume them first; without a trace there is no way to tell "nothing
+   * arrived" from "it arrived and did not match".
+   * @param type - the event type that was seen.
+   * @param event - the mouse event.
+   */
+  const observeSideButton = (type: string, event: MouseEvent): void => {
+    if (event.button !== 3 && event.button !== 4) return
+    note({ sideButton: { type, button: event.button } })
+  }
+
   /**
    * Dispatch one event to the first matching binding.
    * @param event - the captured event.
@@ -46,11 +61,13 @@ export function startTriggers(bindings: readonly TriggerBinding[]): () => void {
     dispatch(event as Event, trigger => matchesKey(trigger, event))
   }
   const onMouseDown = (event: MouseEvent): void => {
+    observeSideButton('mousedown', event)
     dispatch(event as Event, trigger => matchesMouse(trigger, event))
   }
   // Back/forward are acted on at auxclick, so the default has to be cancelled
   // there too or the browser navigates while the action starts.
   const onAuxClick = (event: MouseEvent): void => {
+    observeSideButton('auxclick', event)
     for (const binding of bindings) {
       if (!binding.triggers().some(trigger => matchesMouse(trigger, event))) continue
       event.preventDefault()

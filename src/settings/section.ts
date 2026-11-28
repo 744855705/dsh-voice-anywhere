@@ -18,6 +18,20 @@ import { STYLE } from './styles.ts'
 /** The two independent trigger lists the page edits. */
 type Column = 'voice' | 'submit'
 
+/** Same-tab signal: `storage` only reaches other tabs, so the engine needs this. */
+const TRIGGERS_CHANGED = 'voice-anywhere:triggers'
+
+/**
+ * Tell the running engine that a list changed.
+ */
+function announceChange(): void {
+  try {
+    window.dispatchEvent(new Event(TRIGGERS_CHANGED))
+  } catch {
+    // A page without a window (tests) simply has no engine to notify.
+  }
+}
+
 /**
  * Render one editable trigger list.
  * @param props - translator, copy, values and the three callbacks.
@@ -68,10 +82,12 @@ export function SettingsSection(props: any) {
         const next = [...voice.filter(entry => entry !== expression), expression]
         setVoice(next)
         saveTriggerText(next)
+        announceChange()
       } else {
         const next = [...submit.filter(entry => entry !== expression), expression]
         setSubmit(next)
         saveSubmitText(next)
+        announceChange()
       }
       setMessage(`${t('settings.captured')} ${expression}`)
       setCapturing(null)
@@ -90,10 +106,12 @@ export function SettingsSection(props: any) {
       const next = voice.filter(entry => entry !== value)
       setVoice(next)
       saveTriggerText(next)
+      announceChange()
     } else {
       const next = submit.filter(entry => entry !== value)
       setSubmit(next)
       saveSubmitText(next)
+      announceChange()
     }
   }
   const toggle = (column: Column): void => {
